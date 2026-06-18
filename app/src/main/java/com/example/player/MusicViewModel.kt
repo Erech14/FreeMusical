@@ -63,11 +63,10 @@ class MusicViewModel(
     val mediaError = MusicPlayerEngine.hasMediaError
 
     // Settings states
-    private val _appTheme = MutableStateFlow(prefs.getInt("app_theme", 0)) // 0: Dark, 1: Light, 2: Adaptive
+    private val _appTheme = MutableStateFlow(0) // Locked to Dark by default
     val appTheme = _appTheme.asStateFlow()
 
-    private val _appStyle = MutableStateFlow(prefs.getInt("app_style", 0)) 
-    // 0: Standard, 1: Glassmorphism, 2: Neumorphism, 3: Minimalism, 4: Material 
+    private val _appStyle = MutableStateFlow(2) // Locked to Glassmorphism (2)
     val appStyle = _appStyle.asStateFlow()
 
     private val _appLanguage = MutableStateFlow(prefs.getString("app_language", "Russian") ?: "Russian")

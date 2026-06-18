@@ -74,11 +74,32 @@ fun MainScreen(
     val language by viewModel.appLanguage.collectAsStateWithLifecycle()
     val appStyle by viewModel.appStyle.collectAsStateWithLifecycle()
 
-    var showSettings by remember { mutableStateOf(false) }
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val defaultPlaylistId by viewModel.defaultPlaylistId.collectAsStateWithLifecycle()
+
+    var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var isPlayerDetailedOpened by remember { mutableStateOf(false) }
 
-    // Launcher for directory picker
+    var showPlaylistNameDialog by remember { mutableStateOf(false) }
+    var pendingPlaylistUri by remember { mutableStateOf<Uri?>(null) }
+    var newPlaylistName by remember { mutableStateOf("") }
+
+    val playlistCreatorLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val takeFlags: Int = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, takeFlags)
+            } catch (e: Exception) { e.printStackTrace() }
+            
+            pendingPlaylistUri = uri
+            showPlaylistNameDialog = true
+        }
+    }
+
+    // Launcher for general directory picker
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -99,7 +120,6 @@ fun MainScreen(
     ) { isGranted ->
         viewModel.setPermissionGranted(isGranted)
         if (isGranted && selectedFolderUri == null) {
-            // Trigger folder selection on first success
             try {
                 folderPickerLauncher.launch(null)
             } catch (e: Exception) {
@@ -118,11 +138,59 @@ fun MainScreen(
         viewModel.setPermissionGranted(hasPermission)
     }
 
-    val backgroundStyleColors = if (appStyle == 2) {
-        listOf(Color(0xFF2B5876), Color(0xFF4E4376)) // Colorful gradient for glassmorphism
-    } else {
-        listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background)
+    // Identify if current folder is the "Главный" / "Main" playlist
+    val isCurrentMainPlaylist = remember(playlists, selectedFolderUri) {
+        playlists.any { (it.name == "Главный" || it.name == "Main" || it.name == "Главный :3") && it.uri == selectedFolderUri }
     }
+
+    if (showPlaylistNameDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showPlaylistNameDialog = false
+                pendingPlaylistUri = null
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newPlaylistName.isNotBlank() && pendingPlaylistUri != null) {
+                        viewModel.addPlaylist(newPlaylistName, pendingPlaylistUri!!)
+                    }
+                    showPlaylistNameDialog = false
+                    pendingPlaylistUri = null
+                }) {
+                    Text(Strings.get("create", language), color = Color(0xFF00F5D4), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPlaylistNameDialog = false
+                    pendingPlaylistUri = null
+                }) {
+                    Text(Strings.get("cancel", language), color = Color.White.copy(alpha = 0.6f), fontSize = 16.sp)
+                }
+            },
+            containerColor = Color(0xFF1C1D22),
+            title = { Text(Strings.get("playlist_name", language), color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                TextField(
+                    value = newPlaylistName,
+                    onValueChange = { newPlaylistName = it },
+                    placeholder = { Text(Strings.get("enter_name", language), color = Color.Gray) },
+                    colors = TextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedContainerColor = Color.White.copy(alpha = 0.08f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.08f),
+                        focusedIndicatorColor = Color(0xFF118270),
+                        unfocusedIndicatorColor = Color.Transparent
+                    )
+                )
+            },
+            modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
+        )
+    }
+
+    // Deep glowing sea-violet backdrop gradient for Glassmorphism
+    val backgroundStyleColors = listOf(Color(0xFF171329), Color(0xFF0B2B28))
 
     Box(modifier = Modifier.fillMaxSize().background(Brush.linearGradient(backgroundStyleColors))) {
         Scaffold(
@@ -137,31 +205,26 @@ fun MainScreen(
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = "Плеер",
-                                tint = Color(0xFF118270),
+                                imageVector = if (selectedTab == 0) Icons.Default.MusicNote else if (selectedTab == 1) Icons.Default.QueueMusic else Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = Color(0xFF00F5D4),
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
-                                text = Strings.get("app_name", language),
-                                color = MaterialTheme.colorScheme.onBackground,
+                                text = when (selectedTab) {
+                                    0 -> Strings.get("app_name", language)
+                                    1 -> Strings.get("tab_playlists", language)
+                                    else -> Strings.get("tab_settings", language)
+                                },
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
+                                fontSize = 19.sp
                             )
                         }
                     },
                     actions = {
-                        IconButton(
-                            onClick = { showSettings = true },
-                            modifier = Modifier.testTag("settings_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = Strings.get("settings", language),
-                                tint = Color(0xFF8E8E93)
-                            )
-                        }
-                        if (isPermissionGranted && selectedFolderUri != null) {
+                        // Display reset directory ONLY on Tab 0 (Главная) AND ONLY if NOT current Main playlist
+                        if (selectedTab == 0 && isPermissionGranted && selectedFolderUri != null && !isCurrentMainPlaylist) {
                             IconButton(
                                 onClick = { viewModel.changeFolder() },
                                 modifier = Modifier.testTag("change_folder_button")
@@ -169,28 +232,32 @@ fun MainScreen(
                                 Icon(
                                     imageVector = Icons.Default.FolderOpen,
                                     contentDescription = Strings.get("change_folder", language),
-                                    tint = Color(0xFF8E8E93)
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                        
+                        // Add playlist button directly in the TopBar for the Playlists Tab
+                        if (selectedTab == 1 && isPermissionGranted) {
+                            IconButton(
+                                onClick = {
+                                    newPlaylistName = ""
+                                    playlistCreatorLauncher.launch(null)
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = Strings.get("create_playlist", language),
+                                    tint = Color.White
                                 )
                             }
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = Color.Transparent,
-                        titleContentColor = if (appStyle == 2) Color.White else MaterialTheme.colorScheme.onBackground
+                        containerColor = Color.Black.copy(alpha = 0.2f),
+                        titleContentColor = Color.White
                     )
                 )
-            },
-            bottomBar = {
-                if (currentTrack != null) {
-                    BottomPlayBar(
-                        track = currentTrack!!,
-                        isPlaying = isPlaying,
-                        onPlayPauseClick = { viewModel.togglePlayPause() },
-                        onStopClick = { viewModel.stopPlayback() },
-                        onBarClick = { isPlayerDetailedOpened = true },
-                        style = appStyle
-                    )
-                }
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
@@ -200,230 +267,534 @@ fun MainScreen(
                     .padding(innerPadding),
                 color = Color.Transparent
             ) {
-            when {
-                !isPermissionGranted -> {
-                    PermissionOnboarding(
-                        onGrantClick = { permissionLauncher.launch(permissionString) },
-                        language = language
-                    )
-                }
-                selectedFolderUri == null -> {
-                    FolderSelectionOnboarding(
-                        onSelectFolderClick = { folderPickerLauncher.launch(null) },
-                        language = language
-                    )
-                }
-                else -> {
-                    // Fully configured music client
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Transparent)
-                    ) {
-                        // Display error message if any
-                        mediaError?.let { error ->
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = error,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    fontSize = 14.sp,
-                                    modifier = Modifier.padding(12.dp),
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
+                when {
+                    !isPermissionGranted -> {
+                        PermissionOnboarding(
+                            onGrantClick = { permissionLauncher.launch(permissionString) },
+                            language = language
+                        )
+                    }
+                    selectedFolderUri == null -> {
+                        FolderSelectionOnboarding(
+                            onSelectFolderClick = { folderPickerLauncher.launch(null) },
+                            language = language
+                        )
+                    }
+                    else -> {
+                        // Smooth Sliding Telegram Tab Transitions
+                        AnimatedContent(
+                            targetState = selectedTab,
+                            transitionSpec = {
+                                if (targetState > initialState) {
+                                    (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                                        slideOutHorizontally { width -> -width } + fadeOut()
+                                    )
+                                } else {
+                                    (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                                        slideOutHorizontally { width -> width } + fadeOut()
+                                    )
+                                }
+                            },
+                            label = "tab_transition",
+                            modifier = Modifier.fillMaxSize()
+                        ) { tab ->
+                            when (tab) {
+                                0 -> {
+                                    // ТАБ 0: ГЛАВНАЯ (Tracks list with search)
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Transparent)
+                                    ) {
+                                        mediaError?.let { error ->
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                            ) {
+                                                Text(
+                                                    text = error,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                                    fontSize = 14.sp,
+                                                    modifier = Modifier.padding(12.dp),
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
 
-                        // Search and Sync Row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = {
-                                    Text(
-                                        text = Strings.get("search", language),
-                                        color = Color(0xFF8E8E93),
-                                        fontSize = 14.sp
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = Strings.get("search", language),
-                                        tint = Color(0xFF8E8E93)
-                                    )
-                                },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Clear",
-                                                tint = Color(0xFF8E8E93)
+                                        // Search and Sync row with glass style
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            TextField(
+                                                value = searchQuery,
+                                                onValueChange = { searchQuery = it },
+                                                placeholder = {
+                                                    Text(
+                                                        text = Strings.get("search", language),
+                                                        color = Color.LightGray,
+                                                        fontSize = 14.sp
+                                                    )
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Search,
+                                                        contentDescription = Strings.get("search", language),
+                                                        tint = Color(0xFF00F5D4)
+                                                    )
+                                                },
+                                                trailingIcon = {
+                                                    if (searchQuery.isNotEmpty()) {
+                                                        IconButton(onClick = { searchQuery = "" }) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Close,
+                                                                contentDescription = "Clear",
+                                                                tint = Color.White
+                                                            )
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(52.dp)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(26.dp))
+                                                    .testTag("search_input"),
+                                                shape = RoundedCornerShape(26.dp),
+                                                colors = TextFieldDefaults.colors(
+                                                    focusedTextColor = Color.White,
+                                                    unfocusedTextColor = Color.White,
+                                                    focusedContainerColor = Color.Black.copy(alpha = 0.3f),
+                                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.25f),
+                                                    disabledContainerColor = Color.Transparent,
+                                                    focusedIndicatorColor = Color.Transparent,
+                                                    unfocusedIndicatorColor = Color.Transparent
+                                                ),
+                                                singleLine = true
                                             )
+
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            IconButton(
+                                                onClick = {
+                                                    val uri = Uri.parse(selectedFolderUri!!)
+                                                    viewModel.scanDirectory(uri)
+                                                },
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                                                    .testTag("scan_button"),
+                                                enabled = !isScanning
+                                            ) {
+                                                if (isScanning) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(24.dp),
+                                                        color = Color(0xFF00F5D4),
+                                                        strokeWidth = 2.dp
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Refresh,
+                                                        contentDescription = "Rescan",
+                                                        tint = Color(0xFF00F5D4)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Play actions row
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            Button(
+                                                onClick = { viewModel.playSequential() },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
+                                                modifier = Modifier.padding(end = 8.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.FormatListNumbered, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(Strings.get("play_in_order", language), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            }
+                                            Button(
+                                                onClick = { viewModel.playRandomly() },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(Strings.get("play_shuffle", language), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        if (isScanning) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .weight(1f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    CircularProgressIndicator(color = Color(0xFF00F5D4))
+                                                    Spacer(modifier = Modifier.height(12.dp))
+                                                    Text(
+                                                        text = Strings.get("scanning", language),
+                                                        color = Color.White,
+                                                        fontSize = 15.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                }
+                                            }
+                                        } else if (tracks.isEmpty()) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .weight(1f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    modifier = Modifier.padding(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.MusicOff,
+                                                        contentDescription = null,
+                                                        tint = Color.LightGray,
+                                                        modifier = Modifier.size(64.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.height(12.dp))
+                                                    Text(
+                                                        text = Strings.get("library_empty", language),
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color.White,
+                                                        fontSize = 18.sp
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = Strings.get("add_folder", language),
+                                                        color = Color.LightGray,
+                                                        fontSize = 14.sp,
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            val filteredList = remember(tracks, searchQuery) {
+                                                if (searchQuery.isBlank()) {
+                                                    tracks
+                                                } else {
+                                                    tracks.filter {
+                                                        it.fileName.contains(searchQuery, ignoreCase = true) ||
+                                                                it.title.contains(searchQuery, ignoreCase = true) ||
+                                                                it.artist.contains(searchQuery, ignoreCase = true)
+                                                    }
+                                                }
+                                            }
+
+                                            LazyColumn(
+                                                modifier = Modifier.weight(1f),
+                                                contentPadding = PaddingValues(bottom = 160.dp) // Large space to float custom navigation
+                                            ) {
+                                                items(filteredList, key = { it.uriString }) { track ->
+                                                    TrackItemRow(
+                                                        track = track,
+                                                        isCurrent = currentTrack?.uriString == track.uriString,
+                                                        isPlaying = isPlaying && currentTrack?.uriString == track.uriString,
+                                                        onClick = { viewModel.playTrack(track) },
+                                                        style = 2 // Lock to Glassmorphism
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(52.dp)
-                                    .testTag("search_input"),
-                                shape = RoundedCornerShape(26.dp),
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                                ),
-                                singleLine = true
-                            )
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            IconButton(
-                                onClick = {
-                                    val uri = Uri.parse(selectedFolderUri!!)
-                                    viewModel.scanDirectory(uri)
-                                },
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                                    .testTag("scan_button"),
-                                enabled = !isScanning
-                            ) {
-                                if (isScanning) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        color = Color(0xFF118270),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Rescan",
-                                        tint = Color(0xFF118270)
-                                    )
                                 }
-                            }
-                        }
+                                1 -> {
+                                    // ТАБ 1: ПЛЕЙЛИСТЫ (Playlists screen)
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = Strings.get("playlists", language),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 20.sp,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                        
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        
+                                        Button(
+                                            onClick = {
+                                                newPlaylistName = ""
+                                                playlistCreatorLauncher.launch(null)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(Strings.get("create_playlist", language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        }
 
-                        // Play actions row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Button(
-                                onClick = { viewModel.playSequential() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
-                                modifier = Modifier.padding(end = 8.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Icon(imageVector = Icons.Default.FormatListNumbered, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(Strings.get("play_in_order", language), fontSize = 12.sp)
-                            }
-                            Button(
-                                onClick = { viewModel.playRandomly() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(Strings.get("play_shuffle", language), fontSize = 12.sp)
-                            }
-                        }
+                                        Spacer(modifier = Modifier.height(16.dp))
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                                        LazyColumn(
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(bottom = 160.dp)
+                                        ) {
+                                            items(playlists) { playlist ->
+                                                val isMainPlaylist = playlist.name == "Главный" || playlist.name == "Main" || playlist.name == "Главный :3"
+                                                val isActive = selectedFolderUri == playlist.uri
 
-                        if (isScanning) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(color = Color(0xFF118270))
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = Strings.get("scanning", language),
-                                        color = Color(0xFF8E8E93),
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
-                        } else if (tracks.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.padding(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.MusicOff,
-                                        contentDescription = null,
-                                        tint = Color(0xFF8E8E93),
-                                        modifier = Modifier.size(64.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = Strings.get("library_empty", language),
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                        fontSize = 18.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = Strings.get("add_folder", language),
-                                        color = Color(0xFF8E8E93),
-                                        fontSize = 14.sp,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                }
-                            }
-                        } else {
-                            val filteredList = remember(tracks, searchQuery) {
-                                if (searchQuery.isBlank()) {
-                                    tracks
-                                } else {
-                                    tracks.filter {
-                                        it.fileName.contains(searchQuery, ignoreCase = true) ||
-                                                it.title.contains(searchQuery, ignoreCase = true) ||
-                                                it.artist.contains(searchQuery, ignoreCase = true)
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 6.dp)
+                                                        .border(
+                                                            width = if (isActive) 2.dp else 1.dp,
+                                                            color = if (isActive) Color(0xFF00F5D4) else Color.White.copy(alpha = 0.15f),
+                                                            shape = RoundedCornerShape(16.dp)
+                                                        )
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .clickable {
+                                                            viewModel.selectFolder(Uri.parse(playlist.uri))
+                                                            selectedTab = 0 // Transition beautifully back to tracks screen
+                                                        },
+                                                    shape = RoundedCornerShape(16.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Folder,
+                                                            contentDescription = null,
+                                                            tint = if (isActive) Color(0xFF00F5D4) else Color.LightGray,
+                                                            modifier = Modifier.size(36.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(16.dp))
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = playlist.name,
+                                                                color = Color.White,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 16.sp
+                                                            )
+                                                            Spacer(modifier = Modifier.height(2.dp))
+                                                            Text(
+                                                                text = playlist.uri,
+                                                                fontSize = 11.sp,
+                                                                color = Color.LightGray,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                        
+                                                        // Star icon for default playlist
+                                                        IconButton(onClick = {
+                                                            if (defaultPlaylistId == playlist.id) viewModel.setDefaultPlaylist(null)
+                                                            else viewModel.setDefaultPlaylist(playlist.id)
+                                                        }) {
+                                                            Icon(
+                                                                imageVector = if (defaultPlaylistId == playlist.id) Icons.Default.Star else Icons.Outlined.StarOutline,
+                                                                contentDescription = Strings.get("default", language),
+                                                                tint = if (defaultPlaylistId == playlist.id) Color(0xFFFFCC00) else Color.Gray,
+                                                                modifier = Modifier.size(24.dp)
+                                                            )
+                                                        }
+
+                                                        // HIDE delete button completely on the Playlists Tab for "Главный" / "Main" playlist
+                                                        if (!isMainPlaylist) {
+                                                            IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Delete,
+                                                                    contentDescription = Strings.get("delete", language),
+                                                                    tint = Color(0xFFFF453A),
+                                                                    modifier = Modifier.size(24.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                            }
+                                else -> {
+                                    // ТАБ 2: НАСТРОЙКИ (Settings screen)
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = Strings.get("appearance", language),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 20.sp,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(bottom = 12.dp)
+                                        )
 
-                            LazyColumn(
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(bottom = 12.dp)
-                            ) {
-                                items(filteredList, key = { it.uriString }) { track ->
-                                    TrackItemRow(
-                                        track = track,
-                                        isCurrent = currentTrack?.uriString == track.uriString,
-                                        isPlaying = isPlaying && currentTrack?.uriString == track.uriString,
-                                        onClick = { viewModel.playTrack(track) },
-                                        style = appStyle
-                                    )
+                                        // Read-only info boxes to show dark glassmorphism styling
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.25f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(Strings.get("theme", language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                                Text("Тёмная (По умолчанию)", color = Color(0xFF00F5D4), fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                            }
+                                        }
+
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.25f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(Strings.get("style", language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                                Text("Глассморфизм ✨", color = Color(0xFF00F5D4), fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(16.dp))
+
+                                        // LANGUAGE SELECTOR
+                                        Text(
+                                            text = Strings.get("language", language),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+
+                                        var langExpanded by remember { mutableStateOf(false) }
+                                        val languages = listOf("Russian", "Cute Russian", "English")
+                                        ExposedDropdownMenuBox(
+                                            expanded = langExpanded,
+                                            onExpandedChange = { langExpanded = it },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            TextField(
+                                                value = language.takeIf { languages.contains(it) } ?: "Russian",
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
+                                                colors = TextFieldDefaults.colors(
+                                                    focusedTextColor = Color.White,
+                                                    unfocusedTextColor = Color.White,
+                                                    focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                    focusedIndicatorColor = Color.Transparent,
+                                                    unfocusedIndicatorColor = Color.Transparent
+                                                ),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                                    .menuAnchor()
+                                            )
+                                            ExposedDropdownMenu(
+                                                expanded = langExpanded,
+                                                onDismissRequest = { langExpanded = false },
+                                                modifier = Modifier.background(Color(0xFF1E1F24))
+                                            ) {
+                                                languages.forEach { selectionOption ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(selectionOption, color = Color.White, fontWeight = FontWeight.Bold) },
+                                                        onClick = {
+                                                            viewModel.setAppLanguage(selectionOption)
+                                                            langExpanded = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(24.dp))
+
+                                        // SPECIAL MANAGE CHANNELS SECTION
+                                        // "Кроме как из меню настроек" - We can delete ANY playlist (including "Главный" / "Main") from here!
+                                        Text(
+                                            text = "Управление плейлистами (Настройки)",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+
+                                        LazyColumn(
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(bottom = 160.dp)
+                                        ) {
+                                            items(playlists) { playlist ->
+                                                val isMain = playlist.name == "Главный" || playlist.name == "Main" || playlist.name == "Главный :3"
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 4.dp)
+                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text(playlist.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                                if (isMain) {
+                                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                                    Text("★ Главный", color = Color(0xFF00F5D4), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                            Text(playlist.uri, color = Color.LightGray, fontSize = 10.sp, maxLines = 1)
+                                                        }
+                                                        
+                                                        // Deleting "Главный" is fully allowed in this settings list context!
+                                                        IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Delete,
+                                                                contentDescription = Strings.get("delete", language),
+                                                                tint = Color(0xFFFF453A),
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -431,18 +802,91 @@ fun MainScreen(
                 }
             }
         }
-    }
 
-        // Settings Slide-up or overlay
-        AnimatedVisibility(
-            visible = showSettings,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        // Floating custom bottom navigation & player bar stacked vertically
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
         ) {
-            SettingsScreen(
-                viewModel = viewModel,
-                onClose = { showSettings = false }
-            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                // 1. Mini-player floating glass card on top of custom bottom bar
+                if (isPermissionGranted && selectedFolderUri != null && currentTrack != null) {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        BottomPlayBar(
+                            track = currentTrack!!,
+                            isPlaying = isPlaying,
+                            onPlayPauseClick = { viewModel.togglePlayPause() },
+                            onStopClick = { viewModel.stopPlayback() },
+                            onBarClick = { isPlayerDetailedOpened = true },
+                            style = 2 // Lock to Glassmorphism
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                // 2. Custom Telegram-Style Floating Navigation Bar Capsule
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .widthIn(max = 420.dp)
+                        .fillMaxWidth(0.9f)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(Color.Black.copy(alpha = 0.85f))
+                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(32.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val tabLabels = listOf(
+                        Strings.get("tab_main", language) to Icons.Default.MusicNote,
+                        Strings.get("tab_playlists", language) to Icons.Default.QueueMusic,
+                        Strings.get("tab_settings", language) to Icons.Default.Settings
+                    )
+
+                    tabLabels.forEachIndexed { index, (label, icon) ->
+                        val isSelected = selectedTab == index
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedTab = index }
+                                .padding(vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Highlight pill container around active icon
+                            Box(
+                                modifier = Modifier
+                                    .height(32.dp)
+                                    .width(64.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSelected) Color(0xFF118270).copy(alpha = 0.35f) else Color.Transparent),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = if (isSelected) Color(0xFF00F5D4) else Color(0xFF8E8E93),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // Expanded full-screen sliding vinyl turntable player sheet
@@ -506,7 +950,7 @@ fun MainScreen(
                         onShuffleClick = { viewModel.toggleShuffle() },
                         onSeek = { position -> viewModel.seekTo(position) },
                         language = language,
-                        style = appStyle
+                        style = 2 // Lock to Glassmorphism
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))

@@ -7,6 +7,9 @@ object Strings {
 
     private val localizedStrings = mapOf(
         "English" to mapOf(
+            "tab_main" to "Main",
+            "tab_playlists" to "Playlists",
+            "tab_settings" to "Settings",
             "app_name" to "Player",
             "now_playing" to "NOW PLAYING",
             "play_in_order" to "In order",
@@ -41,6 +44,9 @@ object Strings {
             "choose_audio" to "Choose an audio track"
         ),
         "Russian" to mapOf(
+            "tab_main" to "Главная",
+            "tab_playlists" to "Плейлисты",
+            "tab_settings" to "Настройки",
             "app_name" to "Треки",
             "now_playing" to "СЕЙЧАС ИГРАЕТ",
             "play_in_order" to "По порядку",
@@ -75,6 +81,9 @@ object Strings {
             "choose_audio" to "Выберите аудиозапись"
         ),
         "Cute Russian" to mapOf(
+            "tab_main" to "Главная ^_^_",
+            "tab_playlists" to "Плейлистики",
+            "tab_settings" to "Настроечки",
             "app_name" to "Треки :3",
             "now_playing" to "СЕЙЧАС ИГРАЕТ ^_^",
             "play_in_order" to "По порядочку",
