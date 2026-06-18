@@ -2,6 +2,7 @@ package com.example.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -25,32 +26,38 @@ private val DarkColorScheme =
 
 private val LightColorScheme =
   lightColorScheme(
-    primary = PrimaryAmber,
-    onPrimary = CharcoalBlack,
-    secondary = AccentOrange,
-    background = CharcoalBlack, // Keep it premium dark for a music player by default!
-    surface = CharcoalGray,
-    onBackground = SoftWhite,
-    onSurface = SoftWhite,
-    surfaceVariant = DarkGreyDeck,
-    onSurfaceVariant = MutedText
+    primary = Color(0xFF118270),
+    onPrimary = Color.White,
+    secondary = Color(0xFF16A085),
+    background = Color.White,
+    surface = Color(0xFFF2F2F7),
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    surfaceVariant = Color(0xFFE5E5EA),
+    onSurfaceVariant = Color.DarkGray
   )
 
 @Composable
 fun MyApplicationTheme(
+  appTheme: Int = 2, // 0: Dark, 1: Light, 2: Adaptive
   darkTheme: Boolean = isSystemInDarkTheme(),
   // Dynamic color is available on Android 12+
   dynamicColor: Boolean = true,
   content: @Composable () -> Unit,
 ) {
+  val isDark = when (appTheme) {
+    0 -> true
+    1 -> false
+    else -> darkTheme
+  }
+
   val colorScheme =
     when {
-      dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+      appTheme == 2 && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
         val context = LocalContext.current
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
       }
-
-      darkTheme -> DarkColorScheme
+      isDark -> DarkColorScheme
       else -> LightColorScheme
     }
 

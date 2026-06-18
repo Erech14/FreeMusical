@@ -71,7 +71,7 @@ fun SettingsScreen(
                     showPlaylistNameDialog = false
                     pendingPlaylistUri = null
                 }) {
-                    Text("Создать")
+                    Text(Strings.get("create", language))
                 }
             },
             dismissButton = {
@@ -79,15 +79,15 @@ fun SettingsScreen(
                     showPlaylistNameDialog = false
                     pendingPlaylistUri = null
                 }) {
-                    Text("Отмена")
+                    Text(Strings.get("cancel", language))
                 }
             },
-            title = { Text("Имя плейлиста") },
+            title = { Text(Strings.get("playlist_name", language)) },
             text = {
                 TextField(
                     value = newPlaylistName,
                     onValueChange = { newPlaylistName = it },
-                    placeholder = { Text("Введите имя") }
+                    placeholder = { Text(Strings.get("enter_name", language)) }
                 )
             }
         )
@@ -96,10 +96,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Настройки", fontWeight = FontWeight.Bold) },
+                title = { Text(Strings.get("settings", language), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "Закрыть")
+                        Icon(Icons.Default.Close, contentDescription = Strings.get("close", language))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -116,13 +116,13 @@ fun SettingsScreen(
         ) {
             // Playlists Section
             item {
-                Text("Плейлисты (Папки)", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                Text(Strings.get("playlists", language), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = { 
                     newPlaylistName = ""
                     folderPickerLauncher.launch(null) 
                 }) {
-                    Text("Создать новый плейлист из папки")
+                    Text(Strings.get("create_playlist", language))
                 }
             }
 
@@ -150,12 +150,12 @@ fun SettingsScreen(
                         }) {
                             Icon(
                                 imageVector = if (defaultPlaylistId == playlist.id) Icons.Default.Star else Icons.Outlined.StarOutline,
-                                contentDescription = "По умолчанию",
+                                contentDescription = Strings.get("default", language),
                                 tint = if (defaultPlaylistId == playlist.id) Color(0xFFFFCC00) else Color.Gray
                             )
                         }
                         IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Default.Delete, contentDescription = Strings.get("delete", language), tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -164,11 +164,15 @@ fun SettingsScreen(
             // Appearance Section
             item {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Оформление", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                Text(Strings.get("appearance", language), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
                 
                 // Theme Dropdown
                 var themeExpanded by remember { mutableStateOf(false) }
-                val themes = listOf("Тёмная", "Светлая", "Адаптивная")
+                val themes = when (language) {
+                    "English" -> listOf("Dark", "Light", "Adaptive")
+                    "Cute Russian" -> listOf("Темненькая", "Светленькая", "Адаптивная :3")
+                    else -> listOf("Тёмная", "Светлая", "Адаптивная")
+                }
                 ExposedDropdownMenuBox(
                     expanded = themeExpanded,
                     onExpandedChange = { themeExpanded = it },
@@ -178,7 +182,7 @@ fun SettingsScreen(
                         value = themes.getOrElse(theme) { themes[2] },
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Тема") },
+                        label = { Text(Strings.get("theme", language)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
                         colors = ExposedDropdownMenuDefaults.textFieldColors(),
                         modifier = Modifier.menuAnchor()
@@ -211,7 +215,7 @@ fun SettingsScreen(
                         value = styles.getOrElse(style) { styles[0] },
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Стиль") },
+                        label = { Text(Strings.get("style", language)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = styleExpanded) },
                         colors = ExposedDropdownMenuDefaults.textFieldColors(),
                         modifier = Modifier.menuAnchor()
@@ -244,7 +248,7 @@ fun SettingsScreen(
                         value = language.takeIf { languages.contains(it) } ?: "Russian",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Язык") },
+                        label = { Text(Strings.get("language", language)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
                         colors = ExposedDropdownMenuDefaults.textFieldColors(),
                         modifier = Modifier.menuAnchor()

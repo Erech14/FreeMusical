@@ -70,6 +70,8 @@ fun MainScreen(
     val duration by viewModel.duration.collectAsStateWithLifecycle()
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsStateWithLifecycle()
     val mediaError by viewModel.mediaError.collectAsStateWithLifecycle()
+    val language by viewModel.appLanguage.collectAsStateWithLifecycle()
+    val appStyle by viewModel.appStyle.collectAsStateWithLifecycle()
 
     var showSettings by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -134,7 +136,7 @@ fun MainScreen(
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
-                                text = stringResource(R.string.app_name),
+                                text = Strings.get("app_name", language),
                                 color = Color(0xFF1C1C1E),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp
@@ -148,7 +150,7 @@ fun MainScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
+                                contentDescription = Strings.get("settings", language),
                                 tint = Color(0xFF8E8E93)
                             )
                         }
@@ -159,7 +161,7 @@ fun MainScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.FolderOpen,
-                                    contentDescription = stringResource(R.string.change_folder),
+                                    contentDescription = Strings.get("change_folder", language),
                                     tint = Color(0xFF8E8E93)
                                 )
                             }
@@ -178,7 +180,8 @@ fun MainScreen(
                         isPlaying = isPlaying,
                         onPlayPauseClick = { viewModel.togglePlayPause() },
                         onStopClick = { viewModel.stopPlayback() },
-                        onBarClick = { isPlayerDetailedOpened = true }
+                        onBarClick = { isPlayerDetailedOpened = true },
+                        style = appStyle
                     )
                 }
             },
@@ -193,12 +196,14 @@ fun MainScreen(
             when {
                 !isPermissionGranted -> {
                     PermissionOnboarding(
-                        onGrantClick = { permissionLauncher.launch(permissionString) }
+                        onGrantClick = { permissionLauncher.launch(permissionString) },
+                        language = language
                     )
                 }
                 selectedFolderUri == null -> {
                     FolderSelectionOnboarding(
-                        onSelectFolderClick = { folderPickerLauncher.launch(null) }
+                        onSelectFolderClick = { folderPickerLauncher.launch(null) },
+                        language = language
                     )
                 }
                 else -> {
@@ -238,7 +243,7 @@ fun MainScreen(
                                 onValueChange = { searchQuery = it },
                                 placeholder = {
                                     Text(
-                                        text = stringResource(R.string.search_hint),
+                                        text = Strings.get("search", language),
                                         color = Color(0xFF8E8E93),
                                         fontSize = 14.sp
                                     )
@@ -246,7 +251,7 @@ fun MainScreen(
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Search,
-                                        contentDescription = "Search",
+                                        contentDescription = Strings.get("search", language),
                                         tint = Color(0xFF8E8E93)
                                     )
                                 },
@@ -300,7 +305,7 @@ fun MainScreen(
                                 } else {
                                     Icon(
                                         imageVector = Icons.Default.Refresh,
-                                        contentDescription = stringResource(R.string.rescan),
+                                        contentDescription = "Rescan",
                                         tint = Color(0xFF118270)
                                     )
                                 }
@@ -322,7 +327,7 @@ fun MainScreen(
                             ) {
                                 Icon(imageVector = Icons.Default.FormatListNumbered, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("По порядку", fontSize = 12.sp)
+                                Text(Strings.get("play_in_order", language), fontSize = 12.sp)
                             }
                             Button(
                                 onClick = { viewModel.playRandomly() },
@@ -331,7 +336,7 @@ fun MainScreen(
                             ) {
                                 Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Вразброс", fontSize = 12.sp)
+                                Text(Strings.get("play_shuffle", language), fontSize = 12.sp)
                             }
                         }
 
@@ -348,7 +353,7 @@ fun MainScreen(
                                     CircularProgressIndicator(color = Color(0xFF118270))
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
-                                        text = stringResource(R.string.scanning),
+                                        text = Strings.get("scanning", language),
                                         color = Color(0xFF8E8E93),
                                         fontSize = 14.sp
                                     )
@@ -373,14 +378,14 @@ fun MainScreen(
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
-                                        text = stringResource(R.string.empty_library_title),
+                                        text = Strings.get("library_empty", language),
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF1C1C1E),
                                         fontSize = 18.sp
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = stringResource(R.string.empty_library_desc),
+                                        text = Strings.get("add_folder", language),
                                         color = Color(0xFF8E8E93),
                                         fontSize = 14.sp,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -409,7 +414,8 @@ fun MainScreen(
                                         track = track,
                                         isCurrent = currentTrack?.uriString == track.uriString,
                                         isPlaying = isPlaying && currentTrack?.uriString == track.uriString,
-                                        onClick = { viewModel.playTrack(track) }
+                                        onClick = { viewModel.playTrack(track) },
+                                        style = appStyle
                                     )
                                 }
                             }
@@ -470,7 +476,7 @@ fun MainScreen(
                         }
 
                         Text(
-                            text = "СЕЙЧАС ИГРАЕТ",
+                            text = Strings.get("now_playing", language),
                             color = SoftWhite,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
@@ -491,7 +497,8 @@ fun MainScreen(
                         onNextClick = { viewModel.playNext() },
                         onPrevClick = { viewModel.playPrevious() },
                         onShuffleClick = { viewModel.toggleShuffle() },
-                        onSeek = { position -> viewModel.seekTo(position) }
+                        onSeek = { position -> viewModel.seekTo(position) },
+                        language = language
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -503,7 +510,8 @@ fun MainScreen(
 
 @Composable
 fun PermissionOnboarding(
-    onGrantClick: () -> Unit
+    onGrantClick: () -> Unit,
+    language: String
 ) {
     Box(
         modifier = Modifier
@@ -536,14 +544,14 @@ fun PermissionOnboarding(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = stringResource(R.string.permission_title),
+                    text = Strings.get("permission_title", language),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = Color(0xFF1C1C1E)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.permission_desc),
+                    text = Strings.get("permission_desc", language),
                     fontSize = 14.sp,
                     color = Color(0xFF8E8E93),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -561,7 +569,7 @@ fun PermissionOnboarding(
                         .testTag("grant_permission_button")
                 ) {
                     Text(
-                        text = stringResource(R.string.grant_permission),
+                        text = Strings.get("grant_permission", language),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -572,7 +580,8 @@ fun PermissionOnboarding(
 
 @Composable
 fun FolderSelectionOnboarding(
-    onSelectFolderClick: () -> Unit
+    onSelectFolderClick: () -> Unit,
+    language: String
 ) {
     Box(
         modifier = Modifier
@@ -626,7 +635,7 @@ fun FolderSelectionOnboarding(
                 }
                 Spacer(modifier = Modifier.height(20.dp))
                 Text(
-                    text = stringResource(R.string.select_folder_title),
+                    text = Strings.get("select_folder_title", language),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = Color(0xFF1C1C1E),
@@ -634,7 +643,7 @@ fun FolderSelectionOnboarding(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.select_folder_desc),
+                    text = Strings.get("select_folder_desc", language),
                     fontSize = 14.sp,
                     color = Color(0xFF8E8E93),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -652,7 +661,7 @@ fun FolderSelectionOnboarding(
                         .testTag("select_folder_button")
                 ) {
                     Text(
-                        text = stringResource(R.string.select_folder_btn),
+                        text = Strings.get("select_folder_btn", language),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -672,7 +681,8 @@ fun PlaybackTurntableDeck(
     onNextClick: () -> Unit,
     onPrevClick: () -> Unit,
     onShuffleClick: () -> Unit,
-    onSeek: (Long) -> Unit
+    onSeek: (Long) -> Unit,
+    language: String
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -689,7 +699,7 @@ fun PlaybackTurntableDeck(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = currentTrack?.title ?: "Дисковод пуст",
+                text = currentTrack?.title ?: Strings.get("deck_empty", language),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = SoftWhite,
@@ -698,7 +708,7 @@ fun PlaybackTurntableDeck(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = currentTrack?.artist ?: "Выберите аудиозапись",
+                text = currentTrack?.artist ?: Strings.get("choose_audio", language),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MutedText,
                 maxLines = 1,
@@ -835,16 +845,30 @@ fun BottomPlayBar(
     isPlaying: Boolean,
     onPlayPauseClick: () -> Unit,
     onStopClick: () -> Unit,
-    onBarClick: () -> Unit
+    onBarClick: () -> Unit,
+    style: Int
 ) {
     val context = LocalContext.current
     val artworkBitmap = rememberTrackArtwork(context, track.uriString)
+
+    val backgroundStyleColors = when (style) {
+        1 -> Color(0xCC1E2125) // Glassmorphism (partially transparent)
+        2 -> Color(0xFF24272D) // Neumorphism
+        3 -> Color.Black // Minimalism
+        else -> Color(0xFF1E2125) // Standard / Material
+    }
+
+    val shape = when (style) {
+        1, 2, 4 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        else -> RoundedCornerShape(0.dp)
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .background(Color(0xFF1E2125))
+            .clip(shape)
+            .background(backgroundStyleColors)
             .clickable { onBarClick() },
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -935,14 +959,22 @@ fun TrackItemRow(
     track: Track,
     isCurrent: Boolean,
     isPlaying: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    style: Int
 ) {
     val context = LocalContext.current
     val artworkBitmap = rememberTrackArtwork(context, track.uriString)
 
+    val itemShape = when (style) {
+        1, 2, 4 -> RoundedCornerShape(12.dp)
+        else -> RoundedCornerShape(0.dp)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(if (style in listOf(1, 2, 4)) 8.dp else 0.dp)
+            .clip(itemShape)
             .clickable { onClick() }
             .background(Color.White)
             .testTag("track_item_card")
