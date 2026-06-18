@@ -410,27 +410,26 @@ fun MainScreen(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.End
+                                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
                                         ) {
                                             Button(
                                                 onClick = { viewModel.playSequential() },
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
-                                                modifier = Modifier.padding(end = 8.dp),
-                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                                             ) {
                                                 Icon(imageVector = Icons.Default.FormatListNumbered, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(Strings.get("play_in_order", language), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(Strings.get("play_in_order", language), fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                             }
                                             Button(
                                                 onClick = { viewModel.playRandomly() },
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
-                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                                             ) {
                                                 Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(Strings.get("play_shuffle", language), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(Strings.get("play_shuffle", language), fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                             }
                                         }
 
@@ -812,6 +811,7 @@ fun MainScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .padding(bottom = 16.dp)
             ) {
                 // 1. Mini-player floating glass card on top of custom bottom bar
