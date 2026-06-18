@@ -205,7 +205,7 @@ fun SettingsScreen(
 
                 // Style Dropdown
                 var styleExpanded by remember { mutableStateOf(false) }
-                val styles = listOf("Стандартный", "Glassmorphism", "Neumorphism", "Minimalism", "Material Design")
+                val styles = listOf("Стандартный", "Material Design", "Глассморфизм")
                 ExposedDropdownMenuBox(
                     expanded = styleExpanded,
                     onExpandedChange = { styleExpanded = it },

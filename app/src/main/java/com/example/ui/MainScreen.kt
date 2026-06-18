@@ -118,11 +118,17 @@ fun MainScreen(
         viewModel.setPermissionGranted(hasPermission)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val backgroundStyleColors = if (appStyle == 2) {
+        listOf(Color(0xFF2B5876), Color(0xFF4E4376)) // Colorful gradient for glassmorphism
+    } else {
+        listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background)
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Brush.linearGradient(backgroundStyleColors))) {
         Scaffold(
             modifier = modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(Color.Transparent),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
@@ -169,8 +175,8 @@ fun MainScreen(
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        titleContentColor = MaterialTheme.colorScheme.onBackground
+                        containerColor = Color.Transparent,
+                        titleContentColor = if (appStyle == 2) Color.White else MaterialTheme.colorScheme.onBackground
                     )
                 )
             },
@@ -186,13 +192,13 @@ fun MainScreen(
                     )
                 }
             },
-            containerColor = MaterialTheme.colorScheme.background
+            containerColor = Color.Transparent
         ) { innerPadding ->
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                color = MaterialTheme.colorScheme.background
+                color = Color.Transparent
             ) {
             when {
                 !isPermissionGranted -> {
@@ -212,7 +218,7 @@ fun MainScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background)
+                            .background(Color.Transparent)
                     ) {
                         // Display error message if any
                         mediaError?.let { error ->
@@ -689,16 +695,30 @@ fun PlaybackTurntableDeck(
     style: Int
 ) {
     val deckShape = when (style) {
-        1, 2, 4 -> RoundedCornerShape(16.dp)
-        3 -> RectangleShape
-        else -> RoundedCornerShape(24.dp)
+        1 -> RoundedCornerShape(28.dp) // Material Design
+        2 -> RoundedCornerShape(20.dp) // Глассморфизм
+        else -> RoundedCornerShape(24.dp) // Стандартный
+    }
+
+    val cardModifier = if (style == 2) {
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color.White.copy(alpha = 0.3f), deckShape)
+    } else {
+        Modifier.fillMaxWidth()
+    }
+
+    val cardColor = when (style) {
+        1 -> MaterialTheme.colorScheme.surfaceVariant
+        2 -> Color.Black.copy(alpha = 0.25f)
+        else -> MaterialTheme.colorScheme.surface
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().then(if (style == 2) Modifier.border(2.dp, Color(0xFF282828), deckShape) else Modifier),
-        colors = CardDefaults.cardColors(containerColor = if (style == 1) Color(0xCC1A1C1E) else CharcoalGray),
+        modifier = cardModifier,
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         shape = deckShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = if (style == 3) 0.dp else 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (style == 2) 0.dp else 8.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -862,24 +882,36 @@ fun BottomPlayBar(
     val artworkBitmap = rememberTrackArtwork(context, track.uriString)
 
     val backgroundStyleColors = when (style) {
-        1 -> Color(0xCC1E2125) // Glassmorphism (partially transparent)
-        2 -> Color(0xFF24272D) // Neumorphism
-        3 -> Color.Black // Minimalism
-        else -> Color(0xFF1E2125) // Standard / Material
+        1 -> MaterialTheme.colorScheme.surfaceVariant
+        2 -> Color.Black.copy(alpha = 0.6f) // Glassmorphism translucent
+        else -> MaterialTheme.colorScheme.surface // Standard
     }
 
     val shape = when (style) {
-        1, 2, 4 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        1 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        2 -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         else -> RoundedCornerShape(0.dp)
     }
 
-    Row(
-        modifier = Modifier
+    val barModifier = if (style == 2) {
+        Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .border(1.dp, Color.White.copy(alpha = 0.3f), shape)
+            .clip(shape)
+            .background(backgroundStyleColors)
+            .clickable { onBarClick() }
+    } else {
+        Modifier
             .fillMaxWidth()
             .height(72.dp)
             .clip(shape)
             .background(backgroundStyleColors)
-            .clickable { onBarClick() },
+            .clickable { onBarClick() }
+    }
+
+    Row(
+        modifier = barModifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -976,18 +1008,38 @@ fun TrackItemRow(
     val artworkBitmap = rememberTrackArtwork(context, track.uriString)
 
     val itemShape = when (style) {
-        1, 2, 4 -> RoundedCornerShape(12.dp)
+        1 -> RoundedCornerShape(12.dp)
+        2 -> RoundedCornerShape(16.dp)
         else -> RoundedCornerShape(0.dp)
     }
 
-    Column(
-        modifier = Modifier
+    val itemBackgroundColor = when (style) {
+        1 -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        2 -> Color.Black.copy(alpha = 0.15f)
+        else -> Color.Transparent
+    }
+
+    val itemModifier = if (style == 2) {
+        Modifier
             .fillMaxWidth()
-            .padding(if (style in listOf(1, 2, 4)) 8.dp else 0.dp)
+            .padding(8.dp)
+            .border(1.dp, Color.White.copy(alpha = 0.2f), itemShape)
             .clip(itemShape)
             .clickable { onClick() }
-            .background(Color.Transparent)
+            .background(itemBackgroundColor)
             .testTag("track_item_card")
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .padding(if (style == 1) 8.dp else 0.dp)
+            .clip(itemShape)
+            .clickable { onClick() }
+            .background(itemBackgroundColor)
+            .testTag("track_item_card")
+    }
+
+    Column(
+        modifier = itemModifier
     ) {
         Row(
             modifier = Modifier
