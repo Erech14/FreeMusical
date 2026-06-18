@@ -71,6 +71,7 @@ fun MainScreen(
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsStateWithLifecycle()
     val mediaError by viewModel.mediaError.collectAsStateWithLifecycle()
 
+    var showSettings by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isPlayerDetailedOpened by remember { mutableStateOf(false) }
 
@@ -141,6 +142,16 @@ fun MainScreen(
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = { showSettings = true },
+                            modifier = Modifier.testTag("settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = Color(0xFF8E8E93)
+                            )
+                        }
                         if (isPermissionGranted && selectedFolderUri != null) {
                             IconButton(
                                 onClick = { viewModel.changeFolder() },
@@ -296,6 +307,34 @@ fun MainScreen(
                             }
                         }
 
+                        // Play actions row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Button(
+                                onClick = { viewModel.playSequential() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
+                                modifier = Modifier.padding(end = 8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.FormatListNumbered, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("По порядку", fontSize = 12.sp)
+                            }
+                            Button(
+                                onClick = { viewModel.playRandomly() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Вразброс", fontSize = 12.sp)
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(4.dp))
 
                         if (isScanning) {
@@ -380,6 +419,18 @@ fun MainScreen(
             }
         }
     }
+
+        // Settings Slide-up or overlay
+        AnimatedVisibility(
+            visible = showSettings,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            SettingsScreen(
+                viewModel = viewModel,
+                onClose = { showSettings = false }
+            )
+        }
 
         // Expanded full-screen sliding vinyl turntable player sheet
         AnimatedVisibility(

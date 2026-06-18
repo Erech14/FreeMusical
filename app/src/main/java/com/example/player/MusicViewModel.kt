@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.MusicDatabase
 import com.example.data.Track
 import com.example.data.TrackRepository
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,8 +41,13 @@ class MusicViewModel(
     private val _isStoragePermissionGranted = MutableStateFlow(false)
     val isStoragePermissionGranted = _isStoragePermissionGranted.asStateFlow()
 
-    // Tracks list from Room database
+    // Tracks list from Room database, sorted descending by prefix number
     val tracksState: StateFlow<List<Track>> = repository.allTracks
+        .map { list ->
+            list.sortedByDescending { track ->
+                track.fileName.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+            }
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -56,11 +62,118 @@ class MusicViewModel(
     val isShuffleEnabled = MusicPlayerEngine.isShuffleEnabled
     val mediaError = MusicPlayerEngine.hasMediaError
 
+    // Settings states
+    private val _appTheme = MutableStateFlow(prefs.getInt("app_theme", 0)) // 0: Dark, 1: Light, 2: Adaptive
+    val appTheme = _appTheme.asStateFlow()
+
+    private val _appStyle = MutableStateFlow(prefs.getInt("app_style", 0)) 
+    // 0: Standard, 1: Glassmorphism, 2: Neumorphism, 3: Minimalism, 4: Material 
+    val appStyle = _appStyle.asStateFlow()
+
+    private val _appLanguage = MutableStateFlow(prefs.getString("app_language", "Russian") ?: "Russian")
+    val appLanguage = _appLanguage.asStateFlow()
+
+    fun setAppTheme(theme: Int) {
+        prefs.edit().putInt("app_theme", theme).apply()
+        _appTheme.value = theme
+    }
+
+    fun setAppStyle(style: Int) {
+        prefs.edit().putInt("app_style", style).apply()
+        _appStyle.value = style
+    }
+
+    fun setAppLanguage(lang: String) {
+        prefs.edit().putString("app_language", lang).apply()
+        _appLanguage.value = lang
+    }
+
+    // Playback control from header
+    fun playSequential() {
+        if (tracksState.value.isEmpty()) return
+        if (isShuffleEnabled.value) toggleShuffle()
+        playTrack(tracksState.value.first())
+    }
+
+    fun playRandomly() {
+        if (tracksState.value.isEmpty()) return
+        if (!isShuffleEnabled.value) toggleShuffle()
+        playTrack(tracksState.value.random())
+    }
+
+    data class SimplePlaylist(val id: String, val name: String, val uri: String)
+
+    private val _playlists = MutableStateFlow<List<SimplePlaylist>>(emptyList())
+    val playlists = _playlists.asStateFlow()
+
+    private val _defaultPlaylistId = MutableStateFlow(prefs.getString("default_playlist_id", null))
+    val defaultPlaylistId = _defaultPlaylistId.asStateFlow()
+
+    fun loadPlaylists() {
+        val jsonStr = prefs.getString("playlists_json", "[]") ?: "[]"
+        try {
+            val arr = org.json.JSONArray(jsonStr)
+            val list = mutableListOf<SimplePlaylist>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                list.add(SimplePlaylist(obj.getString("id"), obj.getString("name"), obj.getString("uri")))
+            }
+            _playlists.value = list
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    fun savePlaylists(list: List<SimplePlaylist>) {
+        val arr = org.json.JSONArray()
+        list.forEach { 
+            val obj = org.json.JSONObject()
+            obj.put("id", it.id)
+            obj.put("name", it.name)
+            obj.put("uri", it.uri)
+            arr.put(obj)
+        }
+        prefs.edit().putString("playlists_json", arr.toString()).apply()
+        _playlists.value = list
+    }
+
+    fun addPlaylist(name: String, uri: Uri) {
+        val newList = _playlists.value.toMutableList()
+        val id = java.util.UUID.randomUUID().toString()
+        newList.add(SimplePlaylist(id, name, uri.toString()))
+        savePlaylists(newList)
+    }
+
+    fun deletePlaylist(id: String) {
+        val newList = _playlists.value.filter { it.id != id }
+        savePlaylists(newList)
+        if (_defaultPlaylistId.value == id) {
+            setDefaultPlaylist(null)
+        }
+    }
+
+    fun setDefaultPlaylist(id: String?) {
+        prefs.edit().putString("default_playlist_id", id).apply()
+        _defaultPlaylistId.value = id
+    }
+
     init {
-        // Load selected folder from SharedPreferences on startup
-        val savedUri = prefs.getString("selected_folder_uri", null)
-        if (savedUri != null && hasPersistedPermission(Uri.parse(savedUri))) {
-            _selectedFolderUri.value = savedUri
+        loadPlaylists()
+        
+        val defaultId = _defaultPlaylistId.value
+        val defaultPlaylist = _playlists.value.find { it.id == defaultId }
+        
+        var startupUriStr: String? = null
+        if (defaultPlaylist != null) {
+            startupUriStr = defaultPlaylist.uri
+        } else {
+            startupUriStr = prefs.getString("selected_folder_uri", null)
+        }
+
+        if (startupUriStr != null) {
+            val uri = Uri.parse(startupUriStr)
+            if (hasPersistedPermission(uri)) {
+                _selectedFolderUri.value = startupUriStr
+                scanDirectory(uri)
+            }
         }
         
         // Listen to tracks database and synch player playlist when db updates

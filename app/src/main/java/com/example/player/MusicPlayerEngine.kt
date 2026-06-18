@@ -17,6 +17,7 @@ object MusicPlayerEngine {
     private var mediaPlayer: MediaPlayer? = null
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
+    private var mediaSession: android.media.session.MediaSession? = null
 
     // Player state flows
     private val _currentTrack = MutableStateFlow<Track?>(null)
@@ -75,6 +76,7 @@ object MusicPlayerEngine {
     }
 
     fun playTrack(context: Context, track: Track) {
+        initMediaSessionIfNeeded(context)
         // Ensure track is in playing catalog
         _hasMediaError.value = null
         val index = playingList.indexOfFirst { it.uriString == track.uriString }
@@ -92,6 +94,7 @@ object MusicPlayerEngine {
 
     private fun startPlayback(context: Context, track: Track) {
         stopProgressTracker()
+        initMediaSessionIfNeeded(context)
         try {
             mediaPlayer?.release()
             mediaPlayer = null
@@ -115,10 +118,13 @@ object MusicPlayerEngine {
             player.setOnErrorListener { _, what, extra ->
                 _hasMediaError.value = "Ошибка проигрывателя: $what ($extra)"
                 _isPlaying.value = false
+                updateMediaSessionState(android.media.session.PlaybackState.STATE_ERROR)
                 false
             }
 
             startProgressTracker()
+            updateMediaSessionMetadata(track)
+            updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
         } catch (e: Exception) {
             e.printStackTrace()
             _hasMediaError.value = "Не удалось воспроизвести файл: ${e.localizedMessage}"
@@ -133,11 +139,13 @@ object MusicPlayerEngine {
                 player.pause()
                 _isPlaying.value = false
                 stopProgressTracker()
+                updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
             } else {
                 try {
                     player.start()
                     _isPlaying.value = true
                     startProgressTracker()
+                    updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
                 } catch (e: Exception) {
                     e.printStackTrace()
                     _hasMediaError.value = "Не удалось возобновить воспроизведение"
@@ -210,8 +218,48 @@ object MusicPlayerEngine {
         progressJob = null
     }
 
+    private fun initMediaSessionIfNeeded(context: Context) {
+        if (mediaSession == null) {
+            mediaSession = android.media.session.MediaSession(context, "MusicPlayerEngine").apply {
+                setCallback(object : android.media.session.MediaSession.Callback() {
+                    override fun onPlay() { togglePlayPause(context) }
+                    override fun onPause() { togglePlayPause(context) }
+                    override fun onSkipToNext() { playNext(context) }
+                    override fun onSkipToPrevious() { playPrevious(context) }
+                    override fun onSeekTo(pos: Long) { seekTo(pos) }
+                })
+                isActive = true
+            }
+        }
+    }
+
+    private fun updateMediaSessionMetadata(track: Track) {
+        val metadataBuilder = android.media.MediaMetadata.Builder()
+            .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, track.title)
+            .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, track.artist)
+            .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, track.duration)
+        
+        mediaSession?.setMetadata(metadataBuilder.build())
+    }
+
+    private fun updateMediaSessionState(state: Int) {
+        val playbackStateBuilder = android.media.session.PlaybackState.Builder()
+            .setActions(
+                android.media.session.PlaybackState.ACTION_PLAY or
+                android.media.session.PlaybackState.ACTION_PAUSE or
+                android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT or
+                android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                android.media.session.PlaybackState.ACTION_PLAY_PAUSE
+            )
+            .setState(state, mediaPlayer?.currentPosition?.toLong() ?: 0L, 1.0f)
+        
+        mediaSession?.setPlaybackState(playbackStateBuilder.build())
+    }
+
     fun release() {
         stopProgressTracker()
+        mediaSession?.release()
+        mediaSession = null
         mediaPlayer?.release()
         mediaPlayer = null
         _isPlaying.value = false
