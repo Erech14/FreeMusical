@@ -218,7 +218,13 @@ object MusicPlayerEngine {
         progressJob = null
     }
 
+    private var appContext: Context? = null
+    private var noisyAudioReceiver: android.content.BroadcastReceiver? = null
+
     private fun initMediaSessionIfNeeded(context: Context) {
+        if (appContext == null) {
+            appContext = context.applicationContext
+        }
         if (mediaSession == null) {
             mediaSession = android.media.session.MediaSession(context, "MusicPlayerEngine").apply {
                 setCallback(object : android.media.session.MediaSession.Callback() {
@@ -229,6 +235,24 @@ object MusicPlayerEngine {
                     override fun onSeekTo(pos: Long) { seekTo(pos) }
                 })
                 isActive = true
+            }
+
+            // Register Noisy Audio Receiver (headphone disconnect)
+            if (noisyAudioReceiver == null) {
+                val receiver = object : android.content.BroadcastReceiver() {
+                    override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+                        if (intent.action == android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                            if (_isPlaying.value) {
+                                togglePlayPause(context)
+                            }
+                        }
+                    }
+                }
+                appContext?.registerReceiver(
+                    receiver,
+                    android.content.IntentFilter(android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+                )
+                noisyAudioReceiver = receiver
             }
         }
     }
@@ -258,6 +282,14 @@ object MusicPlayerEngine {
 
     fun release() {
         stopProgressTracker()
+        
+        noisyAudioReceiver?.let {
+            try {
+                appContext?.unregisterReceiver(it)
+            } catch (e: Exception) { e.printStackTrace() }
+            noisyAudioReceiver = null
+        }
+        
         mediaSession?.release()
         mediaSession = null
         mediaPlayer?.release()

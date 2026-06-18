@@ -211,6 +211,28 @@ class MusicViewModel(
         }
     }
 
+    private fun createMainPlaylistIfNeeded(uri: Uri) {
+        val hasMain = _playlists.value.any { it.name == "Main" || it.name == "Главный" || it.name == "Главный :3" }
+        if (!hasMain) {
+            val name = when(_appLanguage.value) {
+                "Russian" -> "Главный"
+                "Cute Russian" -> "Главный :3"
+                else -> "Main"
+            }
+            // Add playlist
+            val newList = _playlists.value.toMutableList()
+            val id = java.util.UUID.randomUUID().toString()
+            val newPlaylist = SimplePlaylist(id, name, uri.toString())
+            newList.add(newPlaylist)
+            savePlaylists(newList)
+
+            // Set as default if we don't have one
+            if (_defaultPlaylistId.value == null) {
+                setDefaultPlaylist(id)
+            }
+        }
+    }
+
     fun scanDirectory(uri: Uri) {
         viewModelScope.launch {
             _isScanning.value = true
@@ -224,6 +246,8 @@ class MusicViewModel(
             
             // Cache found files in local SQLite
             repository.insertTracks(discovered)
+            
+            createMainPlaylistIfNeeded(uri)
             
             _scanCount.value = discovered.size
             _isScanning.value = false

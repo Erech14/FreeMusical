@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -121,7 +122,7 @@ fun MainScreen(
         Scaffold(
             modifier = modifier
                 .fillMaxSize()
-                .background(Color.White),
+                .background(MaterialTheme.colorScheme.background),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
@@ -137,7 +138,7 @@ fun MainScreen(
                             )
                             Text(
                                 text = Strings.get("app_name", language),
-                                color = Color(0xFF1C1C1E),
+                                color = MaterialTheme.colorScheme.onBackground,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp
                             )
@@ -168,8 +169,8 @@ fun MainScreen(
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = Color.White,
-                        titleContentColor = Color(0xFF1C1C1E)
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground
                     )
                 )
             },
@@ -185,13 +186,13 @@ fun MainScreen(
                     )
                 }
             },
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.background
         ) { innerPadding ->
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                color = Color.White
+                color = MaterialTheme.colorScheme.background
             ) {
             when {
                 !isPermissionGranted -> {
@@ -211,7 +212,7 @@ fun MainScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.White)
+                            .background(MaterialTheme.colorScheme.background)
                     ) {
                         // Display error message if any
                         mediaError?.let { error ->
@@ -272,13 +273,13 @@ fun MainScreen(
                                     .testTag("search_input"),
                                 shape = RoundedCornerShape(26.dp),
                                 colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color(0xFFF2F2F7),
-                                    unfocusedContainerColor = Color(0xFFF2F2F7),
-                                    disabledContainerColor = Color(0xFFF2F2F7),
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                     focusedIndicatorColor = Color.Transparent,
                                     unfocusedIndicatorColor = Color.Transparent,
-                                    focusedTextColor = Color(0xFF1C1C1E),
-                                    unfocusedTextColor = Color(0xFF1C1C1E)
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                                 ),
                                 singleLine = true
                             )
@@ -292,7 +293,7 @@ fun MainScreen(
                                 },
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .background(Color(0xFFF2F2F7), CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                                     .testTag("scan_button"),
                                 enabled = !isScanning
                             ) {
@@ -380,7 +381,7 @@ fun MainScreen(
                                     Text(
                                         text = Strings.get("library_empty", language),
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1C1C1E),
+                                        color = MaterialTheme.colorScheme.onBackground,
                                         fontSize = 18.sp
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -498,7 +499,8 @@ fun MainScreen(
                         onPrevClick = { viewModel.playPrevious() },
                         onShuffleClick = { viewModel.toggleShuffle() },
                         onSeek = { position -> viewModel.seekTo(position) },
-                        language = language
+                        language = language,
+                        style = appStyle
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -516,13 +518,13 @@ fun PermissionOnboarding(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F2F7)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
@@ -547,7 +549,7 @@ fun PermissionOnboarding(
                     text = Strings.get("permission_title", language),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = Color(0xFF1C1C1E)
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -586,13 +588,13 @@ fun FolderSelectionOnboarding(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F2F7)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
@@ -605,6 +607,7 @@ fun FolderSelectionOnboarding(
                         .background(Color(0xFFE5E5EA), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
+                    val circleColor = MaterialTheme.colorScheme.surfaceVariant
                     Canvas(modifier = Modifier.size(50.dp)) {
                         val width = size.width
                         val height = size.height
@@ -622,7 +625,7 @@ fun FolderSelectionOnboarding(
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f)
                         )
                         drawCircle(
-                            color = Color(0xFFF2F2F7),
+                            color = circleColor,
                             radius = width * 0.18f,
                             center = Offset(width * 0.60f, height * 0.65f)
                         )
@@ -638,7 +641,7 @@ fun FolderSelectionOnboarding(
                     text = Strings.get("select_folder_title", language),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = Color(0xFF1C1C1E),
+                    color = MaterialTheme.colorScheme.onBackground,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -682,13 +685,20 @@ fun PlaybackTurntableDeck(
     onPrevClick: () -> Unit,
     onShuffleClick: () -> Unit,
     onSeek: (Long) -> Unit,
-    language: String
+    language: String,
+    style: Int
 ) {
+    val deckShape = when (style) {
+        1, 2, 4 -> RoundedCornerShape(16.dp)
+        3 -> RectangleShape
+        else -> RoundedCornerShape(24.dp)
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CharcoalGray),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        modifier = Modifier.fillMaxWidth().then(if (style == 2) Modifier.border(2.dp, Color(0xFF282828), deckShape) else Modifier),
+        colors = CardDefaults.cardColors(containerColor = if (style == 1) Color(0xCC1A1C1E) else CharcoalGray),
+        shape = deckShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (style == 3) 0.dp else 8.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -976,7 +986,7 @@ fun TrackItemRow(
             .padding(if (style in listOf(1, 2, 4)) 8.dp else 0.dp)
             .clip(itemShape)
             .clickable { onClick() }
-            .background(Color.White)
+            .background(Color.Transparent)
             .testTag("track_item_card")
     ) {
         Row(
@@ -1036,7 +1046,7 @@ fun TrackItemRow(
             ) {
                 Text(
                     text = track.fileName,
-                    color = if (isCurrent) Color(0xFF118270) else Color(0xFF1C1C1E),
+                    color = if (isCurrent) Color(0xFF118270) else MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Normal,
                     fontSize = 15.sp,
                     maxLines = 2,
