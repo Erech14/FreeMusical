@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">АудиоПлеер</string>
+    <string name="permission_title">Доступ к хранилищу</string>
+    <string name="permission_desc">Для поиска и воспроизведения аудиофайлов приложению требуется доступ к музыке на вашем устройстве.</string>
+    <string name="grant_permission">Предоставить доступ</string>
+    <string name="select_folder_title">Выберите папку с музыкой</string>
+    <string name="select_folder_desc">Укажите папку на вашем устройстве, чтобы автоматически отсканировать её и составить музыкальную библиотеку.</string>
+    <string name="select_folder_btn">Выбрать папку</string>
+    <string name="empty_library_title">В папке пусто</string>
+    <string name="empty_library_desc">В этой папке не нашлось аудиофайлов. Попробуйте выбрать другую директорию.</string>
+    <string name="change_folder">Сменить папку</string>
+    <string name="scanning">Сканирование папки…</string>
+    <string name="discovered_tracks">Добавлено треков: %d</string>
+    <string name="now_playing">Сейчас играет</string>
+    <string name="all_tracks">Все аудиозаписи</string>
+    <string name="unknown_artist">Неизвестный исполнитель</string>
+    <string name="unknown_album">Неизвестный альбом</string>
+    <string name="search_hint">Поиск по трекам и артистам…</string>
+    <string name="rescan">Обновить</string>
+</resources>
+

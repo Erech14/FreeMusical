@@ -1,0 +1,50 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer disc circle (Black vinyl) -->
+    <path
+        android:fillColor="#1C1B24"
+        android:pathData="M54,54m-34,0a34,34 0 1,1 68,0a34,34 0 1,1 -68,0" />
+        
+    <!-- Grooves (Concentric grey circles) -->
+    <path
+        android:strokeColor="#3A3845"
+        android:strokeWidth="0.8"
+        android:pathData="M54,54m-30,0a30,30 0 1,1 60,0a30,30 0 1,1 -60,0" />
+    <path
+        android:strokeColor="#3A3845"
+        android:strokeWidth="0.8"
+        android:pathData="M54,54m-26,0a26,26 0 1,1 52,0a26,26 0 1,1 -52,0" />
+    <path
+        android:strokeColor="#2E2C3A"
+        android:strokeWidth="0.8"
+        android:pathData="M54,54m-22,0a22,22 0 1,1 44,0a22,22 0 1,1 -44,0" />
+    <path
+        android:strokeColor="#2E2C3A"
+        android:strokeWidth="0.8"
+        android:pathData="M54,54m-18,0a18,18 0 1,1 36,0a18,18 0 1,1 -36,0" />
+
+    <!-- Center Label (Golden Amber) -->
+    <path
+        android:fillColor="#FFA000"
+        android:pathData="M54,54m-12,0a12,12 0 1,1 24,0a12,12 0 1,1 -24,0" />
+
+    <!-- Core Label Accent (Orange core) -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M54,54m-8,0a8,8 0 1,1 16,0a8,8 0 1,1 -16,0" />
+
+    <!-- Center Hub Hole -->
+    <path
+        android:fillColor="#0F1015"
+        android:pathData="M54,54m-2.5,0a2.5,2.5 0 1,1 5,0a2.5,2.5 0 1,1 -5,0" />
+
+    <!-- Highlight Shine diagonal reflection line -->
+    <path
+        android:fillColor="#15FFFFFF"
+        android:pathData="M34,34 L40,28 L80,68 L74,74 Z" />
+
+</vector>

@@ -1,0 +1,6 @@
+{
+  "name": "АудиоПлеер",
+  "description": "Локальный аудиоклиент для прослушивания музыки из выбранных каталогов с поддержкой поиска и перемешивания треков.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
