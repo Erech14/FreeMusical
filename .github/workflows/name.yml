@@ -29,12 +29,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
-        continue-on-error: true
-
       - name: Assemble Debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
