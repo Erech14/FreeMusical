@@ -159,6 +159,10 @@ class MusicViewModel(
     fun toggleShuffle() {
         MusicPlayerEngine.toggleShuffle()
     }
+    
+    fun stopPlayback() {
+        MusicPlayerEngine.release()
+    }
 
     fun seekTo(positionMs: Long) {
         MusicPlayerEngine.seekTo(positionMs)

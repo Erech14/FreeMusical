@@ -46,7 +46,9 @@ class TrackRepository(
         val projection = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED
         )
 
         var cursor: Cursor? = null
@@ -56,18 +58,22 @@ class TrackRepository(
                 val idIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
                 val nameIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                 val mimeIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val modifiedIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
 
                 do {
                     val docId = cursor.getString(idIdx)
                     val displayName = cursor.getString(nameIdx) ?: "Трек"
                     val mimeType = cursor.getString(mimeIdx)
+                    val sizeValue = if (sizeIdx != -1) cursor.getLong(sizeIdx) else 0L
+                    val modifiedValue = if (modifiedIdx != -1) cursor.getLong(modifiedIdx) else 0L
 
                     if (DocumentsContract.Document.MIME_TYPE_DIR == mimeType) {
                         // Recursively scan subdirectory
                         scanDocumentDir(treeUri, docId, outList)
                     } else if (isAudioFile(displayName, mimeType)) {
                         val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                        val track = extractTrackMetadata(fileUri, displayName)
+                        val track = extractTrackMetadata(fileUri, displayName, sizeValue, modifiedValue)
                         outList.add(track)
                     }
                 } while (cursor.moveToNext())
@@ -85,7 +91,7 @@ class TrackRepository(
         return extensions.any { fileName.endsWith(it, ignoreCase = true) }
     }
 
-    private fun extractTrackMetadata(uri: Uri, displayName: String): Track {
+    private fun extractTrackMetadata(uri: Uri, displayName: String, sizeValue: Long, modifiedValue: Long): Track {
         val retriever = MediaMetadataRetriever()
         var title: String? = null
         var artist: String? = null
@@ -128,7 +134,9 @@ class TrackRepository(
             artist = cleanArtist,
             album = cleanAlbum,
             duration = duration,
-            fileName = displayName
+            fileName = displayName,
+            fileSize = sizeValue,
+            lastModified = modifiedValue
         )
     }
 }

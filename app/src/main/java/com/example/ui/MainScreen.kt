@@ -36,6 +36,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.Image
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.content.Context
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import android.media.MediaMetadataRetriever
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.R
 import com.example.data.Track
 import com.example.player.MusicViewModel
@@ -63,6 +72,7 @@ fun MainScreen(
     val mediaError by viewModel.mediaError.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
+    var isPlayerDetailedOpened by remember { mutableStateOf(false) }
 
     // Launcher for directory picker
     val folderPickerLauncher = rememberLauncherForActivityResult(
@@ -104,59 +114,71 @@ fun MainScreen(
         viewModel.setPermissionGranted(hasPermission)
     }
 
-    Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .background(CharcoalBlack),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = "Плеер",
-                            tint = PrimaryAmber,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            color = SoftWhite,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
-                        )
-                    }
-                },
-                actions = {
-                    if (isPermissionGranted && selectedFolderUri != null) {
-                        IconButton(
-                            onClick = { viewModel.changeFolder() },
-                            modifier = Modifier.testTag("change_folder_button")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.White),
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.FolderOpen,
-                                contentDescription = stringResource(R.string.change_folder),
-                                tint = MutedText
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = "Плеер",
+                                tint = Color(0xFF118270),
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                color = Color(0xFF1C1C1E),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = CharcoalBlack,
-                    titleContentColor = SoftWhite
+                    },
+                    actions = {
+                        if (isPermissionGranted && selectedFolderUri != null) {
+                            IconButton(
+                                onClick = { viewModel.changeFolder() },
+                                modifier = Modifier.testTag("change_folder_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FolderOpen,
+                                    contentDescription = stringResource(R.string.change_folder),
+                                    tint = Color(0xFF8E8E93)
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.White,
+                        titleContentColor = Color(0xFF1C1C1E)
+                    )
                 )
-            )
-        },
-        containerColor = CharcoalBlack
-    ) { innerPadding ->
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            color = CharcoalBlack
-        ) {
+            },
+            bottomBar = {
+                if (currentTrack != null) {
+                    BottomPlayBar(
+                        track = currentTrack!!,
+                        isPlaying = isPlaying,
+                        onPlayPauseClick = { viewModel.togglePlayPause() },
+                        onStopClick = { viewModel.stopPlayback() },
+                        onBarClick = { isPlayerDetailedOpened = true }
+                    )
+                }
+            },
+            containerColor = Color.White
+        ) { innerPadding ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                color = Color.White
+            ) {
             when {
                 !isPermissionGranted -> {
                     PermissionOnboarding(
@@ -173,7 +195,7 @@ fun MainScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 16.dp)
+                            .background(Color.White)
                     ) {
                         // Display error message if any
                         mediaError?.let { error ->
@@ -181,7 +203,7 @@ fun MainScreen(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
                             ) {
                                 Text(
                                     text = error,
@@ -193,25 +215,11 @@ fun MainScreen(
                             }
                         }
 
-                        // Playback Deck & Turf Component
-                        PlaybackTurntableDeck(
-                            currentTrack = currentTrack,
-                            isPlaying = isPlaying,
-                            currentPosition = currentPosition,
-                            duration = duration,
-                            isShuffleEnabled = isShuffleEnabled,
-                            onPlayPauseClick = { viewModel.togglePlayPause() },
-                            onNextClick = { viewModel.playNext() },
-                            onPrevClick = { viewModel.playPrevious() },
-                            onShuffleClick = { viewModel.toggleShuffle() },
-                            onSeek = { position -> viewModel.seekTo(position) }
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Search and Sync Header Row
+                        // Search and Sync Row
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TextField(
@@ -220,7 +228,7 @@ fun MainScreen(
                                 placeholder = {
                                     Text(
                                         text = stringResource(R.string.search_hint),
-                                        color = MutedText,
+                                        color = Color(0xFF8E8E93),
                                         fontSize = 14.sp
                                     )
                                 },
@@ -228,7 +236,7 @@ fun MainScreen(
                                     Icon(
                                         imageVector = Icons.Default.Search,
                                         contentDescription = "Search",
-                                        tint = MutedText
+                                        tint = Color(0xFF8E8E93)
                                     )
                                 },
                                 trailingIcon = {
@@ -237,7 +245,7 @@ fun MainScreen(
                                             Icon(
                                                 imageVector = Icons.Default.Close,
                                                 contentDescription = "Clear",
-                                                tint = MutedText
+                                                tint = Color(0xFF8E8E93)
                                             )
                                         }
                                     }
@@ -248,13 +256,13 @@ fun MainScreen(
                                     .testTag("search_input"),
                                 shape = RoundedCornerShape(26.dp),
                                 colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = CharcoalGray,
-                                    unfocusedContainerColor = CharcoalGray,
-                                    disabledContainerColor = CharcoalGray,
+                                    focusedContainerColor = Color(0xFFF2F2F7),
+                                    unfocusedContainerColor = Color(0xFFF2F2F7),
+                                    disabledContainerColor = Color(0xFFF2F2F7),
                                     focusedIndicatorColor = Color.Transparent,
                                     unfocusedIndicatorColor = Color.Transparent,
-                                    focusedTextColor = SoftWhite,
-                                    unfocusedTextColor = SoftWhite
+                                    focusedTextColor = Color(0xFF1C1C1E),
+                                    unfocusedTextColor = Color(0xFF1C1C1E)
                                 ),
                                 singleLine = true
                             )
@@ -268,56 +276,46 @@ fun MainScreen(
                                 },
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .background(CharcoalGray, CircleShape)
+                                    .background(Color(0xFFF2F2F7), CircleShape)
                                     .testTag("scan_button"),
                                 enabled = !isScanning
                             ) {
                                 if (isScanning) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(24.dp),
-                                        color = PrimaryAmber,
+                                        color = Color(0xFF118270),
                                         strokeWidth = 2.dp
                                     )
                                 } else {
                                     Icon(
                                         imageVector = Icons.Default.Refresh,
                                         contentDescription = stringResource(R.string.rescan),
-                                        tint = PrimaryAmber
+                                        tint = Color(0xFF118270)
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Audio track library stream list
-                        Text(
-                            text = if (isScanning) stringResource(R.string.scanning) else stringResource(R.string.all_tracks),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = SoftWhite,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
 
                         if (isScanning) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(120.dp),
+                                    .weight(1f),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(color = PrimaryAmber)
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    CircularProgressIndicator(color = Color(0xFF118270))
+                                    Spacer(modifier = Modifier.height(12.dp))
                                     Text(
                                         text = stringResource(R.string.scanning),
-                                        color = MutedText,
+                                        color = Color(0xFF8E8E93),
                                         fontSize = 14.sp
                                     )
                                 }
                             }
                         } else if (tracks.isEmpty()) {
-                            // Library is empty
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -331,33 +329,33 @@ fun MainScreen(
                                     Icon(
                                         imageVector = Icons.Default.MusicOff,
                                         contentDescription = null,
-                                        tint = MutedText,
+                                        tint = Color(0xFF8E8E93),
                                         modifier = Modifier.size(64.dp)
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
                                         text = stringResource(R.string.empty_library_title),
                                         fontWeight = FontWeight.Bold,
-                                        color = SoftWhite,
+                                        color = Color(0xFF1C1C1E),
                                         fontSize = 18.sp
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = stringResource(R.string.empty_library_desc),
-                                        color = MutedText,
+                                        color = Color(0xFF8E8E93),
                                         fontSize = 14.sp,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
                                 }
                             }
                         } else {
-                            // Filter tracks
                             val filteredList = remember(tracks, searchQuery) {
                                 if (searchQuery.isBlank()) {
                                     tracks
                                 } else {
                                     tracks.filter {
-                                        it.title.contains(searchQuery, ignoreCase = true) ||
+                                        it.fileName.contains(searchQuery, ignoreCase = true) ||
+                                                it.title.contains(searchQuery, ignoreCase = true) ||
                                                 it.artist.contains(searchQuery, ignoreCase = true)
                                     }
                                 }
@@ -365,7 +363,7 @@ fun MainScreen(
 
                             LazyColumn(
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(bottom = 16.dp)
+                                contentPadding = PaddingValues(bottom = 12.dp)
                             ) {
                                 items(filteredList, key = { it.uriString }) { track ->
                                     TrackItemRow(
@@ -382,6 +380,74 @@ fun MainScreen(
             }
         }
     }
+
+        // Expanded full-screen sliding vinyl turntable player sheet
+        AnimatedVisibility(
+            visible = isPlayerDetailedOpened,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0F1015))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Slide-down handle header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(
+                            onClick = { isPlayerDetailedOpened = false }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Collapse",
+                                tint = SoftWhite,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        Text(
+                            text = "СЕЙЧАС ИГРАЕТ",
+                            color = SoftWhite,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp
+                        )
+
+                        Spacer(modifier = Modifier.size(48.dp))
+                    }
+
+                    // detailed Turntable component
+                    PlaybackTurntableDeck(
+                        currentTrack = currentTrack,
+                        isPlaying = isPlaying,
+                        currentPosition = currentPosition,
+                        duration = duration,
+                        isShuffleEnabled = isShuffleEnabled,
+                        onPlayPauseClick = { viewModel.togglePlayPause() },
+                        onNextClick = { viewModel.playNext() },
+                        onPrevClick = { viewModel.playPrevious() },
+                        onShuffleClick = { viewModel.toggleShuffle() },
+                        onSeek = { position -> viewModel.seekTo(position) }
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -391,12 +457,13 @@ fun PermissionOnboarding(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.White)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = CharcoalGray),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F2F7)),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
@@ -406,14 +473,14 @@ fun PermissionOnboarding(
                 Box(
                     modifier = Modifier
                         .size(80.dp)
-                        .background(DarkGreyDeck, CircleShape),
+                        .background(Color(0xFFE5E5EA), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Security,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
-                        tint = PrimaryAmber
+                        tint = Color(0xFF118270)
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -421,21 +488,21 @@ fun PermissionOnboarding(
                     text = stringResource(R.string.permission_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = SoftWhite
+                    color = Color(0xFF1C1C1E)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.permission_desc),
                     fontSize = 14.sp,
-                    color = MutedText,
+                    color = Color(0xFF8E8E93),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
                     onClick = { onGrantClick() },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryAmber,
-                        contentColor = CharcoalBlack
+                        containerColor = Color(0xFF118270),
+                        contentColor = Color.White
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -459,53 +526,48 @@ fun FolderSelectionOnboarding(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.White)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = CharcoalGray),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F2F7)),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Interactive micro music folder canvas drawing
                 Box(
                     modifier = Modifier
                         .size(100.dp)
-                        .background(DarkGreyDeck, CircleShape),
+                        .background(Color(0xFFE5E5EA), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Canvas(modifier = Modifier.size(50.dp)) {
-                        // Drawing custom visual music folder outline
                         val width = size.width
                         val height = size.height
                         
-                        // Folder background body
                         drawRoundRect(
-                            color = PrimaryAmber,
+                            color = Color(0xFF499587),
                             topLeft = Offset(0f, height * 0.2f),
                             size = androidx.compose.ui.geometry.Size(width, height * 0.75f),
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
                         )
-                        // Folder top tab
                         drawRoundRect(
-                            color = PrimaryAmber,
+                            color = Color(0xFF499587),
                             topLeft = Offset(0f, 0f),
                             size = androidx.compose.ui.geometry.Size(width * 0.45f, height * 0.35f),
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f)
                         )
-                        // Music note circle on top
                         drawCircle(
-                            color = CharcoalGray,
+                            color = Color(0xFFF2F2F7),
                             radius = width * 0.18f,
                             center = Offset(width * 0.60f, height * 0.65f)
                         )
-                        // Music note core
                         drawCircle(
-                            color = AccentOrange,
+                            color = Color(0xFFFFA000),
                             radius = width * 0.08f,
                             center = Offset(width * 0.53f, height * 0.71f)
                         )
@@ -516,22 +578,22 @@ fun FolderSelectionOnboarding(
                     text = stringResource(R.string.select_folder_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = SoftWhite,
+                    color = Color(0xFF1C1C1E),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.select_folder_desc),
                     fontSize = 14.sp,
-                    color = MutedText,
+                    color = Color(0xFF8E8E93),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
                     onClick = { onSelectFolderClick() },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryAmber,
-                        contentColor = CharcoalBlack
+                        containerColor = Color(0xFF118270),
+                        contentColor = Color.White
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -571,12 +633,10 @@ fun PlaybackTurntableDeck(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Rotating physical-like model of vinyl record
             RotatingVinyl(isPlaying = isPlaying)
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Text titles (Scrolling/Ellipses)
             Text(
                 text = currentTrack?.title ?: "Дисковод пуст",
                 style = MaterialTheme.typography.titleMedium,
@@ -596,7 +656,6 @@ fun PlaybackTurntableDeck(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Progress Slider Scrubber
             val sliderPosition = if (duration > 0) currentPosition.toFloat() / duration else 0f
             var isDragging by remember { mutableStateOf(false) }
             var dragPosition by remember { mutableStateOf(0f) }
@@ -641,13 +700,11 @@ fun PlaybackTurntableDeck(
                 )
             }
 
-            // Controls Ribbon Block
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Shuffle Mode Button
                 IconButton(
                     onClick = onShuffleClick,
                     modifier = Modifier.testTag("shuffle_button")
@@ -660,7 +717,6 @@ fun PlaybackTurntableDeck(
                     )
                 }
 
-                // Prev Track Button
                 IconButton(
                     onClick = onPrevClick,
                     modifier = Modifier
@@ -675,7 +731,6 @@ fun PlaybackTurntableDeck(
                     )
                 }
 
-                // Play / Pause Circle Button
                 Box(
                     modifier = Modifier
                         .size(60.dp)
@@ -692,7 +747,6 @@ fun PlaybackTurntableDeck(
                     )
                 }
 
-                // Next Track Button
                 IconButton(
                     onClick = onNextClick,
                     modifier = Modifier
@@ -707,7 +761,6 @@ fun PlaybackTurntableDeck(
                     )
                 }
 
-                // Order Sequential / Shuffle Display Indicator Mode
                 Box(
                     modifier = Modifier
                         .background(DarkGreyDeck, RoundedCornerShape(12.dp))
@@ -726,84 +779,275 @@ fun PlaybackTurntableDeck(
 }
 
 @Composable
+fun BottomPlayBar(
+    track: Track,
+    isPlaying: Boolean,
+    onPlayPauseClick: () -> Unit,
+    onStopClick: () -> Unit,
+    onBarClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val artworkBitmap = rememberTrackArtwork(context, track.uriString)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .background(Color(0xFF1E2125))
+            .clickable { onBarClick() },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(72.dp)
+                .background(Color(0xFF141518)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (artworkBitmap != null) {
+                Image(
+                    bitmap = artworkBitmap.asImageBitmap(),
+                    contentDescription = "Cover Art",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF499587)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = track.title,
+                color = Color.White,
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = track.artist,
+                color = Color(0xFF9E9EA5),
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        IconButton(
+            onClick = onPlayPauseClick,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = "Play/Pause",
+                tint = Color.White,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+
+        IconButton(
+            onClick = onStopClick,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Stop,
+                contentDescription = "Stop",
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+    }
+}
+
+@Composable
 fun TrackItemRow(
     track: Track,
     isCurrent: Boolean,
     isPlaying: Boolean,
     onClick: () -> Unit
 ) {
-    Card(
+    val context = LocalContext.current
+    val artworkBitmap = rememberTrackArtwork(context, track.uriString)
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
             .clickable { onClick() }
-            .testTag("track_item_card"),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isCurrent) DarkGreyDeck else CharcoalGray
-        ),
-        border = if (isCurrent) BorderStroke(1.dp, PrimaryAmber.copy(alpha = 0.5f)) else null,
-        shape = RoundedCornerShape(14.dp)
+            .background(Color.White)
+            .testTag("track_item_card")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left icon container based on playing state
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        if (isCurrent) PrimaryAmber.copy(alpha = 0.15f) else DarkGreyDeck,
-                        CircleShape
-                    ),
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFE5E5EA)),
                 contentAlignment = Alignment.Center
             ) {
-                if (isPlaying) {
-                    // Audio equalizer glowing animation bars
-                    LineEqualizerGlowing()
-                } else {
-                    Icon(
-                        imageVector = if (isCurrent) Icons.Default.Audiotrack else Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = if (isCurrent) PrimaryAmber else MutedText
+                if (artworkBitmap != null) {
+                    Image(
+                        bitmap = artworkBitmap.asImageBitmap(),
+                        contentDescription = "Cover Art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF499587)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
+
+                if (isPlaying) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(2.dp)
+                            .size(16.dp)
+                            .background(Color(0x99000000), RoundedCornerShape(3.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LineEqualizerGlowingSmall()
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
-            // Texts column info
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    text = track.title,
-                    color = if (isCurrent) PrimaryAmber else SoftWhite,
-                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    text = track.fileName,
+                    color = if (isCurrent) Color(0xFF118270) else Color(0xFF1C1C1E),
+                    fontWeight = FontWeight.Normal,
                     fontSize = 15.sp,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = track.artist,
-                    color = MutedText,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = track.getFormattedFileSize(),
+                        color = Color(0xFF8E8E93),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+
+                    Text(
+                        text = track.getFormattedDate(),
+                        color = Color(0xFF8E8E93),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Duration tag
-            Text(
-                text = track.getFormattedDuration(),
-                color = MutedText,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
         }
+
+        HorizontalDivider(
+            color = Color(0xFFEEEEEE),
+            thickness = 1.dp,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp)
+        )
+    }
+}
+
+@Composable
+fun LineEqualizerGlowingSmall() {
+    val infiniteTransition = rememberInfiniteTransition(label = "eq_small")
+    
+    val bar1Height by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(450, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "b1"
+    )
+
+    val bar2Height by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(350, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "b2"
+    )
+
+    val bar3Height by infiniteTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(550, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "b3"
+    )
+
+    Row(
+        modifier = Modifier.size(10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Box(
+            modifier = Modifier
+                .width(2.dp)
+                .fillMaxHeight(bar1Height)
+                .background(Color.White)
+        )
+        Box(
+            modifier = Modifier
+                .width(2.dp)
+                .fillMaxHeight(bar2Height)
+                .background(Color.White)
+        )
+        Box(
+            modifier = Modifier
+                .width(2.dp)
+                .fillMaxHeight(bar3Height)
+                .background(Color.White)
+        )
     }
 }
 
@@ -811,7 +1055,6 @@ fun TrackItemRow(
 fun LineEqualizerGlowing() {
     val infiniteTransition = rememberInfiniteTransition(label = "eq")
     
-    // Create three separate bar animations for dynamic visual wave effects
     val bar1Height by infiniteTransition.animateFloat(
         initialValue = 0.2f,
         targetValue = 0.8f,
@@ -836,7 +1079,7 @@ fun LineEqualizerGlowing() {
         initialValue = 0.1f,
         targetValue = 0.7f,
         animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = LinearEasing),
+            animation = tween(550, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "b3"
@@ -866,6 +1109,29 @@ fun LineEqualizerGlowing() {
                 .background(PrimaryAmber, RoundedCornerShape(1.dp))
         )
     }
+}
+
+@Composable
+fun rememberTrackArtwork(context: Context, uriString: String?): Bitmap? {
+    if (uriString == null) return null
+    var bitmap by remember(uriString) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(uriString) {
+        withContext(Dispatchers.IO) {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(context, Uri.parse(uriString))
+                val artBytes = retriever.embeddedPicture
+                if (artBytes != null) {
+                    bitmap = BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
+                }
+            } catch (e: Exception) {
+                // Ignore failure
+            } finally {
+                retriever.release()
+            }
+        }
+    }
+    return bitmap
 }
 
 fun formatDuration(durationMs: Long): String {
