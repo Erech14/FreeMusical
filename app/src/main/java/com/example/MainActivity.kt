@@ -32,12 +32,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
             MyApplicationTheme(appTheme = appTheme) {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(
-                        viewModel = viewModel,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                MainScreen(
+                    viewModel = viewModel,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }

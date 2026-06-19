@@ -880,8 +880,12 @@ fun MainScreen(
                             Text(
                                 text = label,
                                 color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 2.dp)
                             )
                         }
                     }
