@@ -63,7 +63,7 @@ class MusicViewModel(
     val mediaError = MusicPlayerEngine.hasMediaError
 
     // Settings states
-    private val _appTheme = MutableStateFlow(0) // Locked to Dark by default
+    private val _appTheme = MutableStateFlow(prefs.getInt("app_theme", 2)) // Default to 2 (System theme)
     val appTheme = _appTheme.asStateFlow()
 
     private val _appStyle = MutableStateFlow(2) // Locked to Glassmorphism (2)
@@ -237,18 +237,20 @@ class MusicViewModel(
             _isScanning.value = true
             _scanCount.value = 0
             
-            // Clean up existing library cache in Room before scan
-            repository.clearLibrary()
-            
-            // Perform SAF content resolver crawl
+            // Perform SAF content resolver crawl BEFORE clearing the library
             val discovered = repository.scanDirectoryForMusic(uri)
             
-            // Cache found files in local SQLite
-            repository.insertTracks(discovered)
+            // Cache found files in local SQLite. We only clear and update if we successfully found files,
+            // otherwise we retain existing files so they don't disappear on restarts.
+            if (discovered.isNotEmpty()) {
+                repository.clearLibrary()
+                repository.insertTracks(discovered)
+                _scanCount.value = discovered.size
+            } else {
+                _scanCount.value = tracksState.value.size
+            }
             
             createMainPlaylistIfNeeded(uri)
-            
-            _scanCount.value = discovered.size
             _isScanning.value = false
         }
     }

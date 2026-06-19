@@ -9,6 +9,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -73,6 +75,16 @@ fun MainScreen(
     val mediaError by viewModel.mediaError.collectAsStateWithLifecycle()
     val language by viewModel.appLanguage.collectAsStateWithLifecycle()
     val appStyle by viewModel.appStyle.collectAsStateWithLifecycle()
+    val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
+
+    val isDark = when (appTheme) {
+        0 -> true
+        1 -> false
+        else -> isSystemInDarkTheme()
+    }
+
+    val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
+    val secondaryContentColor = if (isDark) Color.LightGray else Color(0xFF49454F)
 
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val defaultPlaylistId by viewModel.defaultPlaylistId.collectAsStateWithLifecycle()
@@ -189,14 +201,19 @@ fun MainScreen(
         )
     }
 
-    // Deep glowing sea-violet backdrop gradient for Glassmorphism
-    val backgroundStyleColors = listOf(Color(0xFF171329), Color(0xFF0B2B28))
+    // Deep glowing sea-violet backdrop gradient for Dark, soft ice-blue gradient for Light
+    val backgroundStyleColors = if (isDark) {
+        listOf(Color(0xFF171329), Color(0xFF0B2B28))
+    } else {
+        listOf(Color(0xFFEDF2F7), Color(0xFFCAD5E2))
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Brush.linearGradient(backgroundStyleColors))) {
         Scaffold(
             modifier = modifier
                 .fillMaxSize()
-                .background(Color.Transparent),
+                .background(Color.Transparent)
+                .blur(if (isPlayerDetailedOpened) 16.dp else 0.dp),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
@@ -645,44 +662,62 @@ fun MainScreen(
                                             text = Strings.get("appearance", language),
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 20.sp,
-                                            color = Color.White,
+                                            color = contentColor,
                                             modifier = Modifier.padding(bottom = 12.dp)
                                         )
 
-                                        // Read-only info boxes to show dark glassmorphism styling
-                                        Card(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp)
-                                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.25f))
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(Strings.get("theme", language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                                Text("Тёмная (По умолчанию)", color = Color(0xFF00F5D4), fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                            }
+                                        // THEME SELECTOR DROPDOWN
+                                        val currentThemeVal by viewModel.appTheme.collectAsStateWithLifecycle()
+                                        var themeExpanded by remember { mutableStateOf(false) }
+                                        val themeOptions = listOf(0, 1, 2)
+                                        val currentThemeLabel = when (currentThemeVal) {
+                                            0 -> Strings.get("theme_dark", language)
+                                            1 -> Strings.get("theme_light", language)
+                                            else -> Strings.get("theme_system", language)
                                         }
 
-                                        Card(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp)
-                                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.25f))
+                                        ExposedDropdownMenuBox(
+                                            expanded = themeExpanded,
+                                            onExpandedChange = { themeExpanded = it },
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                         ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
+                                            TextField(
+                                                value = currentThemeLabel,
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                                                colors = TextFieldDefaults.colors(
+                                                    focusedTextColor = Color.White,
+                                                    unfocusedTextColor = Color.White,
+                                                    focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                    focusedIndicatorColor = Color.Transparent,
+                                                    unfocusedIndicatorColor = Color.Transparent
+                                                ),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                                    .menuAnchor()
+                                            )
+                                            ExposedDropdownMenu(
+                                                expanded = themeExpanded,
+                                                onDismissRequest = { themeExpanded = false },
+                                                modifier = Modifier.background(Color(0xFF1E1F24))
                                             ) {
-                                                Text(Strings.get("style", language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                                Text("Глассморфизм ✨", color = Color(0xFF00F5D4), fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                                themeOptions.forEach { themeId ->
+                                                    val optionLabel = when (themeId) {
+                                                        0 -> Strings.get("theme_dark", language)
+                                                        1 -> Strings.get("theme_light", language)
+                                                        else -> Strings.get("theme_system", language)
+                                                    }
+                                                    DropdownMenuItem(
+                                                        text = { Text(optionLabel, color = Color.White, fontWeight = FontWeight.Bold) },
+                                                        onClick = {
+                                                            viewModel.setAppTheme(themeId)
+                                                            themeExpanded = false
+                                                        }
+                                                    )
+                                                }
                                             }
                                         }
 
@@ -693,7 +728,7 @@ fun MainScreen(
                                             text = Strings.get("language", language),
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 18.sp,
-                                            color = Color.White,
+                                            color = contentColor,
                                             modifier = Modifier.padding(bottom = 8.dp)
                                         )
 
@@ -747,7 +782,7 @@ fun MainScreen(
                                             text = "Управление плейлистами (Настройки)",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 18.sp,
-                                            color = Color.White,
+                                            color = contentColor,
                                             modifier = Modifier.padding(bottom = 8.dp)
                                         )
 
