@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -937,7 +938,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF0F1015))
+                    .background(if (isDark) Color(0xFF0F1015) else Color(0xFFF2F2F7))
             ) {
                 Column(
                     modifier = Modifier
@@ -960,14 +961,14 @@ fun MainScreen(
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
                                 contentDescription = "Collapse",
-                                tint = SoftWhite,
+                                tint = if (isDark) SoftWhite else Color(0xFF1C1B1F),
                                 modifier = Modifier.size(32.dp)
                             )
                         }
 
                         Text(
                             text = Strings.get("now_playing", language),
-                            color = SoftWhite,
+                            color = if (isDark) SoftWhite else Color(0xFF1C1B1F),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.2.sp
@@ -989,7 +990,8 @@ fun MainScreen(
                         onShuffleClick = { viewModel.toggleShuffle() },
                         onSeek = { position -> viewModel.seekTo(position) },
                         language = language,
-                        style = 2 // Lock to Glassmorphism
+                        style = 2, // Lock to Glassmorphism
+                        isDark = isDark
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -1175,8 +1177,44 @@ fun PlaybackTurntableDeck(
     onShuffleClick: () -> Unit,
     onSeek: (Long) -> Unit,
     language: String,
-    style: Int
+    style: Int,
+    isDark: Boolean
 ) {
+    val context = LocalContext.current
+    var artworkBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(currentTrack?.uriString) {
+        val trackUriStr = currentTrack?.uriString
+        if (trackUriStr != null) {
+            withContext(Dispatchers.IO) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    val uri = Uri.parse(trackUriStr)
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                        retriever.setDataSource(pfd.fileDescriptor)
+                        val artBytes = retriever.embeddedPicture
+                        if (artBytes != null) {
+                            val bitmap = BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
+                            artworkBitmap = bitmap
+                        } else {
+                            artworkBitmap = null
+                        }
+                    }
+                } catch (e: Exception) {
+                    artworkBitmap = null
+                } finally {
+                    try {
+                        retriever.release()
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+            }
+        } else {
+            artworkBitmap = null
+        }
+    }
+
     val deckShape = when (style) {
         1 -> RoundedCornerShape(28.dp) // Material Design
         2 -> RoundedCornerShape(20.dp) // Глассморфизм
@@ -1186,14 +1224,14 @@ fun PlaybackTurntableDeck(
     val cardModifier = if (style == 2) {
         Modifier
             .fillMaxWidth()
-            .border(1.dp, Color.White.copy(alpha = 0.3f), deckShape)
+            .border(1.dp, if (isDark) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.15f), deckShape)
     } else {
         Modifier.fillMaxWidth()
     }
 
     val cardColor = when (style) {
         1 -> MaterialTheme.colorScheme.surfaceVariant
-        2 -> Color.Black.copy(alpha = 0.25f)
+        2 -> if (isDark) Color.Black.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.45f)
         else -> MaterialTheme.colorScheme.surface
     }
 
@@ -1201,13 +1239,25 @@ fun PlaybackTurntableDeck(
         modifier = cardModifier,
         colors = CardDefaults.cardColors(containerColor = cardColor),
         shape = deckShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = if (style == 2) 0.dp else 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (style == 2) 0.dp else 4.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            RotatingVinyl(isPlaying = isPlaying)
+            if (artworkBitmap != null) {
+                Image(
+                    bitmap = artworkBitmap!!.asImageBitmap(),
+                    contentDescription = "Обложка трека",
+                    modifier = Modifier
+                        .size(200.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .shadow(8.dp, shape = RoundedCornerShape(16.dp)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                RotatingVinyl(isPlaying = isPlaying)
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -1215,7 +1265,7 @@ fun PlaybackTurntableDeck(
                 text = currentTrack?.title ?: Strings.get("deck_empty", language),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = SoftWhite,
+                color = if (isDark) SoftWhite else Color(0xFF1C1B1F),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1223,7 +1273,7 @@ fun PlaybackTurntableDeck(
             Text(
                 text = currentTrack?.artist ?: Strings.get("choose_audio", language),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MutedText,
+                color = if (isDark) MutedText else Color(0xFF49454F),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1243,7 +1293,7 @@ fun PlaybackTurntableDeck(
                 Text(
                     text = formatDuration(if (isDragging) (dragPosition * duration).toLong() else currentPosition),
                     fontSize = 11.sp,
-                    color = MutedText,
+                    color = if (isDark) MutedText else Color(0xFF49454F),
                     modifier = Modifier.width(36.dp)
                 )
 
@@ -1259,7 +1309,7 @@ fun PlaybackTurntableDeck(
                     },
                     colors = SliderDefaults.colors(
                         activeTrackColor = PrimaryAmber,
-                        inactiveTrackColor = DarkGreyDeck,
+                        inactiveTrackColor = if (isDark) DarkGreyDeck else Color.Black.copy(alpha = 0.08f),
                         thumbColor = PrimaryAmber
                     ),
                     modifier = Modifier.weight(1f)
@@ -1268,7 +1318,7 @@ fun PlaybackTurntableDeck(
                 Text(
                     text = formatDuration(duration),
                     fontSize = 11.sp,
-                    color = MutedText,
+                    color = if (isDark) MutedText else Color(0xFF49454F),
                     modifier = Modifier.width(36.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.End
                 )
@@ -1283,7 +1333,7 @@ fun PlaybackTurntableDeck(
                     onClick = onShuffleClick,
                     modifier = Modifier.testTag("shuffle_button")
                 ) {
-                    val tint = if (isShuffleEnabled) PrimaryAmber else MutedText
+                    val tint = if (isShuffleEnabled) PrimaryAmber else (if (isDark) MutedText else Color(0xFF49454F))
                     Icon(
                         imageVector = if (isShuffleEnabled) Icons.Default.Shuffle else Icons.Outlined.Shuffle,
                         contentDescription = "Режим случайного порядка",
@@ -1300,7 +1350,7 @@ fun PlaybackTurntableDeck(
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Предыдущий трек",
-                        tint = SoftWhite,
+                        tint = if (isDark) SoftWhite else Color(0xFF1C1B1F),
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -1330,20 +1380,20 @@ fun PlaybackTurntableDeck(
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Следующий трек",
-                        tint = SoftWhite,
+                        tint = if (isDark) SoftWhite else Color(0xFF1C1B1F),
                         modifier = Modifier.size(32.dp)
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .background(DarkGreyDeck, RoundedCornerShape(12.dp))
+                        .background(if (isDark) DarkGreyDeck else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = if (isShuffleEnabled) "RAND" else "SEQ",
                         fontWeight = FontWeight.Bold,
-                        color = if (isShuffleEnabled) PrimaryAmber else MutedText,
+                        color = if (isShuffleEnabled) PrimaryAmber else (if (isDark) MutedText else Color(0xFF49454F)),
                         fontSize = 11.sp
                     )
                 }
