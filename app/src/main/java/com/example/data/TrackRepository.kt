@@ -5,7 +5,11 @@ import android.database.Cursor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -34,16 +38,25 @@ class TrackRepository(
      */
     suspend fun scanDirectoryForMusic(treeUri: Uri, existingTracks: Map<String, Track>): List<Track> = withContext(Dispatchers.IO) {
         val discoveredTracks = mutableListOf<Track>()
+        val tasks = mutableListOf<Deferred<Track>>()
         try {
             val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
-            scanDocumentDir(treeUri, rootDocId, existingTracks, discoveredTracks)
+            scanDocumentDir(this, treeUri, rootDocId, existingTracks, discoveredTracks, tasks)
+            discoveredTracks.addAll(tasks.awaitAll())
         } catch (e: Exception) {
             e.printStackTrace()
         }
         return@withContext discoveredTracks
     }
 
-    private fun scanDocumentDir(treeUri: Uri, parentDocId: String, existingTracks: Map<String, Track>, outList: MutableList<Track>) {
+    private fun scanDocumentDir(
+        scope: CoroutineScope,
+        treeUri: Uri,
+        parentDocId: String,
+        existingTracks: Map<String, Track>,
+        outList: MutableList<Track>,
+        tasks: MutableList<Deferred<Track>>
+    ) {
         val resolver = context.contentResolver
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
         
@@ -74,7 +87,7 @@ class TrackRepository(
 
                     if (DocumentsContract.Document.MIME_TYPE_DIR == mimeType) {
                         // Recursively scan subdirectory
-                        scanDocumentDir(treeUri, docId, existingTracks, outList)
+                        scanDocumentDir(scope, treeUri, docId, existingTracks, outList, tasks)
                     } else if (isAudioFile(displayName, mimeType)) {
                         val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
                         val uriStr = fileUri.toString()
@@ -83,8 +96,9 @@ class TrackRepository(
                         if (existingTrack != null && existingTrack.fileSize == sizeValue && existingTrack.lastModified == modifiedValue) {
                             outList.add(existingTrack)
                         } else {
-                            val track = extractTrackMetadata(fileUri, displayName, sizeValue, modifiedValue)
-                            outList.add(track)
+                            tasks.add(scope.async {
+                                extractTrackMetadata(fileUri, displayName, sizeValue, modifiedValue)
+                            })
                         }
                     }
                 } while (cursor.moveToNext())

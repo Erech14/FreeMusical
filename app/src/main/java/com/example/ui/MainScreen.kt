@@ -453,7 +453,7 @@ fun MainScreen(
 
                                         Spacer(modifier = Modifier.height(4.dp))
 
-                                        if (isScanning) {
+                                        if (isScanning && tracks.isEmpty()) {
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
