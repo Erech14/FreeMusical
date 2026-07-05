@@ -11,7 +11,7 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.musicplayer.vnlrec"
+    applicationId = "erech14.freemusical.app"
     minSdk = 24
     targetSdk = 36
     versionCode = 31

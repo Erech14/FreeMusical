@@ -26,15 +26,16 @@ private val DarkColorScheme =
 
 private val LightColorScheme =
   lightColorScheme(
-    primary = Color(0xFF118270),
+    primary = Color(0xFF004D40), // Dark Teal for high contrast
     onPrimary = Color.White,
-    secondary = Color(0xFF16A085),
+    secondary = Color(0xFF00332C),
     background = Color.White,
-    surface = Color(0xFFF2F2F7),
+    surface = Color.White,
     onBackground = Color.Black,
     onSurface = Color.Black,
-    surfaceVariant = Color(0xFFE5E5EA),
-    onSurfaceVariant = Color.DarkGray
+    surfaceVariant = Color(0xFFEEEEEE),
+    onSurfaceVariant = Color.Black,
+    outline = Color(0xFF1C1C1E)
   )
 
 @Composable

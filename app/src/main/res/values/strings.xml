@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">АудиоПлеер</string>
+    <string name="app_name">FreeMusical</string>
     <string name="permission_title">Доступ к хранилищу</string>
     <string name="permission_desc">Для поиска и воспроизведения аудиофайлов приложению требуется доступ к музыке на вашем устройстве.</string>
     <string name="grant_permission">Предоставить доступ</string>

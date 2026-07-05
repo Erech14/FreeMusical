@@ -84,8 +84,8 @@ fun MainScreen(
         else -> isSystemInDarkTheme()
     }
 
-    val contentColor = if (isDark) Color.White else Color(0xFF1C1B1F)
-    val secondaryContentColor = if (isDark) Color.LightGray else Color(0xFF49454F)
+    val contentColor = if (isDark) Color.White else Color.Black
+    val secondaryContentColor = if (isDark) Color.LightGray else Color(0xFF111115)
 
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val defaultPlaylistId by viewModel.defaultPlaylistId.collectAsStateWithLifecycle()
@@ -202,11 +202,11 @@ fun MainScreen(
         )
     }
 
-    // Deep glowing sea-violet backdrop gradient for Dark, soft ice-blue gradient for Light
+    // Deep glowing sea-violet backdrop gradient for Dark, pure white for Light (high contrast)
     val backgroundStyleColors = if (isDark) {
         listOf(Color(0xFF171329), Color(0xFF0B2B28))
     } else {
-        listOf(Color(0xFFEDF2F7), Color(0xFFCAD5E2))
+        listOf(Color.White, Color.White)
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Brush.linearGradient(backgroundStyleColors))) {
@@ -225,7 +225,7 @@ fun MainScreen(
                             Icon(
                                 imageVector = if (selectedTab == 0) Icons.Default.MusicNote else if (selectedTab == 1) Icons.Default.QueueMusic else Icons.Default.Settings,
                                 contentDescription = null,
-                                tint = Color(0xFF00F5D4),
+                                tint = if (isDark) Color(0xFF00F5D4) else MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
@@ -234,7 +234,7 @@ fun MainScreen(
                                     1 -> Strings.get("tab_playlists", language)
                                     else -> Strings.get("tab_settings", language)
                                 },
-                                color = Color.White,
+                                color = contentColor,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 19.sp
                             )
@@ -250,7 +250,7 @@ fun MainScreen(
                                 Icon(
                                     imageVector = Icons.Default.FolderOpen,
                                     contentDescription = Strings.get("change_folder", language),
-                                    tint = Color.White
+                                    tint = contentColor
                                 )
                             }
                         }
@@ -266,14 +266,14 @@ fun MainScreen(
                                 Icon(
                                     imageVector = Icons.Default.Add,
                                     contentDescription = Strings.get("create_playlist", language),
-                                    tint = Color.White
+                                    tint = contentColor
                                 )
                             }
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = Color.Black.copy(alpha = 0.2f),
-                        titleContentColor = Color.White
+                        containerColor = if (isDark) Color.Black.copy(alpha = 0.2f) else Color.White,
+                        titleContentColor = contentColor
                     )
                 )
             },
@@ -944,7 +944,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(if (isDark) Color(0xFF0F1015) else Color(0xFFF2F2F7))
+                    .background(if (isDark) Color(0xFF0F1015) else Color.White)
             ) {
                 Column(
                     modifier = Modifier
@@ -1230,14 +1230,14 @@ fun PlaybackTurntableDeck(
     val cardModifier = if (style == 2) {
         Modifier
             .fillMaxWidth()
-            .border(1.dp, if (isDark) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.15f), deckShape)
+            .border(1.dp, if (isDark) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.35f), deckShape)
     } else {
         Modifier.fillMaxWidth()
     }
 
     val cardColor = when (style) {
         1 -> MaterialTheme.colorScheme.surfaceVariant
-        2 -> if (isDark) Color.Black.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.45f)
+        2 -> if (isDark) Color.Black.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.85f)
         else -> MaterialTheme.colorScheme.surface
     }
 
@@ -1315,7 +1315,7 @@ fun PlaybackTurntableDeck(
                     },
                     colors = SliderDefaults.colors(
                         activeTrackColor = PrimaryAmber,
-                        inactiveTrackColor = if (isDark) DarkGreyDeck else Color.Black.copy(alpha = 0.08f),
+                        inactiveTrackColor = if (isDark) DarkGreyDeck else Color.Black.copy(alpha = 0.25f),
                         thumbColor = PrimaryAmber
                     ),
                     modifier = Modifier.weight(1f)
@@ -1339,7 +1339,7 @@ fun PlaybackTurntableDeck(
                     onClick = onShuffleClick,
                     modifier = Modifier.testTag("shuffle_button")
                 ) {
-                    val tint = if (isShuffleEnabled) PrimaryAmber else (if (isDark) MutedText else Color(0xFF49454F))
+                    val tint = if (isShuffleEnabled) PrimaryAmber else (if (isDark) MutedText else Color.Black)
                     Icon(
                         imageVector = if (isShuffleEnabled) Icons.Default.Shuffle else Icons.Outlined.Shuffle,
                         contentDescription = "Режим случайного порядка",
@@ -1356,7 +1356,7 @@ fun PlaybackTurntableDeck(
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Предыдущий трек",
-                        tint = if (isDark) SoftWhite else Color(0xFF1C1B1F),
+                        tint = if (isDark) SoftWhite else Color.Black,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -1386,20 +1386,20 @@ fun PlaybackTurntableDeck(
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Следующий трек",
-                        tint = if (isDark) SoftWhite else Color(0xFF1C1B1F),
+                        tint = if (isDark) SoftWhite else Color.Black,
                         modifier = Modifier.size(32.dp)
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .background(if (isDark) DarkGreyDeck else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                        .background(if (isDark) DarkGreyDeck else Color.Black.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = if (isShuffleEnabled) "RAND" else "SEQ",
                         fontWeight = FontWeight.Bold,
-                        color = if (isShuffleEnabled) PrimaryAmber else (if (isDark) MutedText else Color(0xFF49454F)),
+                        color = if (isShuffleEnabled) PrimaryAmber else (if (isDark) MutedText else Color.Black),
                         fontSize = 11.sp
                     )
                 }
