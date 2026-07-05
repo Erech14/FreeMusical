@@ -848,81 +848,87 @@ fun MainScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(bottom = 16.dp)
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Mini-player floating glass card on top of custom bottom bar
-                if (isPermissionGranted && selectedFolderUri != null && currentTrack != null) {
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
+                // Unified Custom Telegram-Style Floating Capsule
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .fillMaxWidth(0.9f)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(Color.Black.copy(alpha = 0.85f))
+                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(32.dp))
+                        .padding(bottom = 8.dp)
+                ) {
+                    // 1. Mini-player inside the capsule
+                    if (isPermissionGranted && selectedFolderUri != null && currentTrack != null) {
                         BottomPlayBar(
                             track = currentTrack!!,
                             isPlaying = isPlaying,
                             onPlayPauseClick = { viewModel.togglePlayPause() },
                             onStopClick = { viewModel.stopPlayback() },
                             onBarClick = { isPlayerDetailedOpened = true },
-                            style = 2 // Lock to Glassmorphism
+                            style = 3 // Transparent style for merged capsule
+                        )
+                        Divider(
+                            color = Color.White.copy(alpha = 0.1f),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
 
-                // 2. Custom Telegram-Style Floating Navigation Bar Capsule
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .widthIn(max = 420.dp)
-                        .fillMaxWidth(0.9f)
-                        .clip(RoundedCornerShape(32.dp))
-                        .background(Color.Black.copy(alpha = 0.85f))
-                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(32.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val tabLabels = listOf(
-                        Strings.get("tab_main", language) to Icons.Default.MusicNote,
-                        Strings.get("tab_playlists", language) to Icons.Default.QueueMusic,
-                        Strings.get("tab_settings", language) to Icons.Default.Settings
-                    )
+                    // 2. Navigation Items
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val tabLabels = listOf(
+                            Strings.get("tab_main", language) to Icons.Default.MusicNote,
+                            Strings.get("tab_playlists", language) to Icons.Default.QueueMusic,
+                            Strings.get("tab_settings", language) to Icons.Default.Settings
+                        )
 
-                    tabLabels.forEachIndexed { index, (label, icon) ->
-                        val isSelected = selectedTab == index
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { selectedTab = index }
-                                .padding(vertical = 4.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Highlight pill container around active icon
-                            Box(
+                        tabLabels.forEachIndexed { index, (label, icon) ->
+                            val isSelected = selectedTab == index
+                            Column(
                                 modifier = Modifier
-                                    .height(32.dp)
-                                    .width(64.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isSelected) Color(0xFF118270).copy(alpha = 0.35f) else Color.Transparent),
-                                contentAlignment = Alignment.Center
+                                    .weight(1f)
+                                    .clickable { selectedTab = index }
+                                    .padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = label,
-                                    tint = if (isSelected) Color(0xFF00F5D4) else Color(0xFF8E8E93),
-                                    modifier = Modifier.size(24.dp)
+                                // Highlight pill container around active icon
+                                Box(
+                                    modifier = Modifier
+                                        .height(32.dp)
+                                        .width(64.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (isSelected) Color(0xFF118270).copy(alpha = 0.35f) else Color.Transparent),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        tint = if (isSelected) Color(0xFF00F5D4) else Color(0xFF8E8E93),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 2.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = label,
-                                color = if (isSelected) Color.White else Color(0xFF8E8E93),
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 2.dp)
-                            )
                         }
                     }
                 }
@@ -1417,12 +1423,14 @@ fun BottomPlayBar(
     val backgroundStyleColors = when (style) {
         1 -> MaterialTheme.colorScheme.surfaceVariant
         2 -> Color.Black.copy(alpha = 0.6f) // Glassmorphism translucent
+        3 -> Color.Transparent // Merged capsule style
         else -> MaterialTheme.colorScheme.surface // Standard
     }
 
     val shape = when (style) {
         1 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
         2 -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        3 -> RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
         else -> RoundedCornerShape(0.dp)
     }
 
@@ -1431,6 +1439,13 @@ fun BottomPlayBar(
             .fillMaxWidth()
             .height(72.dp)
             .border(1.dp, Color.White.copy(alpha = 0.3f), shape)
+            .clip(shape)
+            .background(backgroundStyleColors)
+            .clickable { onBarClick() }
+    } else if (style == 3) {
+        Modifier
+            .fillMaxWidth()
+            .height(72.dp)
             .clip(shape)
             .background(backgroundStyleColors)
             .clickable { onBarClick() }
