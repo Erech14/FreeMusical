@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -14,13 +16,26 @@ android {
     applicationId = "erech14.freemusical.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 31
-    versionName = "1.8"
+    versionCode = 32
+    versionName = "2.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
+    // Reconstruct the keystore from base64 if needed to prevent Git corruption issues
+    val keystoreFile = file("${rootDir}/my-upload-key.jks")
+    val base64File = file("${rootDir}/my-upload-key.jks.base64")
+    if (base64File.exists()) {
+      try {
+        val base64Text = base64File.readText().trim()
+        val decodedBytes = Base64.getDecoder().decode(base64Text)
+        keystoreFile.writeBytes(decodedBytes)
+      } catch (e: Exception) {
+        println("Warning: Failed to reconstruct my-upload-key.jks from base64: ${e.message}")
+      }
+    }
+
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
       storeFile = file(keystorePath)
