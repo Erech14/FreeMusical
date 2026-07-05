@@ -24,22 +24,26 @@ class TrackRepository(
         trackDao.insertTracks(tracks)
     }
 
+    suspend fun replaceAll(tracks: List<Track>) = withContext(Dispatchers.IO) {
+        trackDao.replaceAll(tracks)
+    }
+
     /**
      * Highly optimized recursive scanner using ContentResolver and DocumentsContract queries.
      * This avoids costly DocumentFile object instantiation overhead.
      */
-    suspend fun scanDirectoryForMusic(treeUri: Uri): List<Track> = withContext(Dispatchers.IO) {
+    suspend fun scanDirectoryForMusic(treeUri: Uri, existingTracks: Map<String, Track>): List<Track> = withContext(Dispatchers.IO) {
         val discoveredTracks = mutableListOf<Track>()
         try {
             val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
-            scanDocumentDir(treeUri, rootDocId, discoveredTracks)
+            scanDocumentDir(treeUri, rootDocId, existingTracks, discoveredTracks)
         } catch (e: Exception) {
             e.printStackTrace()
         }
         return@withContext discoveredTracks
     }
 
-    private fun scanDocumentDir(treeUri: Uri, parentDocId: String, outList: MutableList<Track>) {
+    private fun scanDocumentDir(treeUri: Uri, parentDocId: String, existingTracks: Map<String, Track>, outList: MutableList<Track>) {
         val resolver = context.contentResolver
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
         
@@ -70,11 +74,18 @@ class TrackRepository(
 
                     if (DocumentsContract.Document.MIME_TYPE_DIR == mimeType) {
                         // Recursively scan subdirectory
-                        scanDocumentDir(treeUri, docId, outList)
+                        scanDocumentDir(treeUri, docId, existingTracks, outList)
                     } else if (isAudioFile(displayName, mimeType)) {
                         val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                        val track = extractTrackMetadata(fileUri, displayName, sizeValue, modifiedValue)
-                        outList.add(track)
+                        val uriStr = fileUri.toString()
+                        val existingTrack = existingTracks[uriStr]
+                        
+                        if (existingTrack != null && existingTrack.fileSize == sizeValue && existingTrack.lastModified == modifiedValue) {
+                            outList.add(existingTrack)
+                        } else {
+                            val track = extractTrackMetadata(fileUri, displayName, sizeValue, modifiedValue)
+                            outList.add(track)
+                        }
                     }
                 } while (cursor.moveToNext())
             }

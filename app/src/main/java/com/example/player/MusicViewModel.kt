@@ -237,14 +237,14 @@ class MusicViewModel(
             _isScanning.value = true
             _scanCount.value = 0
             
+            val existingTracks = tracksState.value.associateBy { it.uriString }
             // Perform SAF content resolver crawl BEFORE clearing the library
-            val discovered = repository.scanDirectoryForMusic(uri)
+            val discovered = repository.scanDirectoryForMusic(uri, existingTracks)
             
             // Cache found files in local SQLite. We only clear and update if we successfully found files,
             // otherwise we retain existing files so they don't disappear on restarts.
             if (discovered.isNotEmpty()) {
-                repository.clearLibrary()
-                repository.insertTracks(discovered)
+                repository.replaceAll(discovered)
                 _scanCount.value = discovered.size
             } else {
                 _scanCount.value = tracksState.value.size

@@ -39,5 +39,19 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Dynamically rescan directory when app comes to foreground
+        val currentUriStr = viewModel.selectedFolderUri.value
+        if (currentUriStr != null) {
+            try {
+                val uri = android.net.Uri.parse(currentUriStr)
+                viewModel.scanDirectory(uri)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 }
 
