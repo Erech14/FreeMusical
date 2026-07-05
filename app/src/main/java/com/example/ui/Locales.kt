@@ -87,7 +87,7 @@ object Strings {
             "theme_system" to "Как в системе (По умолчанию)"
         ),
         "Cute Russian" to mapOf(
-            "tab_main" to "Главная ^_^_",
+            "tab_main" to "Главная ^_^",
             "tab_playlists" to "Плейлистики",
             "tab_settings" to "Настроечки",
             "app_name" to "Треки :3",

@@ -69,7 +69,7 @@ class MusicViewModel(
     private val _appStyle = MutableStateFlow(2) // Locked to Glassmorphism (2)
     val appStyle = _appStyle.asStateFlow()
 
-    private val _appLanguage = MutableStateFlow(prefs.getString("app_language", "Russian") ?: "Russian")
+    private val _appLanguage = MutableStateFlow(prefs.getString("app_language", "Cute Russian") ?: "Cute Russian")
     val appLanguage = _appLanguage.asStateFlow()
 
     fun setAppTheme(theme: Int) {
