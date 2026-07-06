@@ -95,6 +95,7 @@ object MusicPlayerEngine {
     private fun startPlayback(context: Context, track: Track) {
         stopProgressTracker()
         initMediaSessionIfNeeded(context)
+        val focusGranted = requestAudioFocus(context)
         try {
             mediaPlayer?.release()
             mediaPlayer = null
@@ -102,12 +103,15 @@ object MusicPlayerEngine {
             val player = MediaPlayer().apply {
                 setDataSource(context, Uri.parse(track.uriString))
                 prepare()
-                start()
+                if (focusGranted) {
+                    start()
+                }
             }
             mediaPlayer = player
 
             _currentTrack.value = track
-            _isPlaying.value = true
+            _isPlaying.value = focusGranted
+            wasPlayingBeforeFocusLoss = !focusGranted
             _duration.value = player.duration.toLong()
             _currentPosition.value = 0L
 
@@ -140,15 +144,22 @@ object MusicPlayerEngine {
                 _isPlaying.value = false
                 stopProgressTracker()
                 updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
+                abandonAudioFocus()
+                wasPlayingBeforeFocusLoss = false
             } else {
-                try {
-                    player.start()
-                    _isPlaying.value = true
-                    startProgressTracker()
-                    updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    _hasMediaError.value = "Не удалось возобновить воспроизведение"
+                val focusGranted = requestAudioFocus(context)
+                if (focusGranted) {
+                    try {
+                        player.start()
+                        _isPlaying.value = true
+                        startProgressTracker()
+                        updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        _hasMediaError.value = "Не удалось возобновить воспроизведение"
+                    }
+                } else {
+                    wasPlayingBeforeFocusLoss = true
                 }
             }
         } else {
@@ -220,6 +231,100 @@ object MusicPlayerEngine {
 
     private var appContext: Context? = null
     private var noisyAudioReceiver: android.content.BroadcastReceiver? = null
+    private var audioManager: android.media.AudioManager? = null
+    private var focusRequest: android.media.AudioFocusRequest? = null
+    private var wasPlayingBeforeFocusLoss = false
+
+    private val focusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { focusChange ->
+        val context = appContext ?: return@OnAudioFocusChangeListener
+        when (focusChange) {
+            android.media.AudioManager.AUDIOFOCUS_GAIN -> {
+                if (wasPlayingBeforeFocusLoss) {
+                    wasPlayingBeforeFocusLoss = false
+                    mediaPlayer?.let { player ->
+                        if (!player.isPlaying) {
+                            try {
+                                player.start()
+                                _isPlaying.value = true
+                                startProgressTracker()
+                                updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+            }
+            android.media.AudioManager.AUDIOFOCUS_LOSS -> {
+                wasPlayingBeforeFocusLoss = false
+                mediaPlayer?.let { player ->
+                    if (player.isPlaying) {
+                        player.pause()
+                        _isPlaying.value = false
+                        stopProgressTracker()
+                        updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
+                    }
+                }
+            }
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                wasPlayingBeforeFocusLoss = _isPlaying.value
+                if (wasPlayingBeforeFocusLoss) {
+                    mediaPlayer?.let { player ->
+                        if (player.isPlaying) {
+                            player.pause()
+                            _isPlaying.value = false
+                            stopProgressTracker()
+                            updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun requestAudioFocus(context: Context): Boolean {
+        if (appContext == null) {
+            appContext = context.applicationContext
+        }
+        if (audioManager == null) {
+            audioManager = context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        }
+        val am = audioManager ?: return false
+
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val playbackAttributes = android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+
+            val request = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(playbackAttributes)
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(focusChangeListener)
+                .build()
+            
+            focusRequest = request
+            am.requestAudioFocus(request) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(
+                focusChangeListener,
+                android.media.AudioManager.STREAM_MUSIC,
+                android.media.AudioManager.AUDIOFOCUS_GAIN
+            ) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val am = audioManager ?: return
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            focusRequest?.let { am.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(focusChangeListener)
+        }
+    }
 
     private fun initMediaSessionIfNeeded(context: Context) {
         if (appContext == null) {
@@ -282,6 +387,9 @@ object MusicPlayerEngine {
 
     fun release() {
         stopProgressTracker()
+        abandonAudioFocus()
+        wasPlayingBeforeFocusLoss = false
+        audioManager = null
         
         noisyAudioReceiver?.let {
             try {
