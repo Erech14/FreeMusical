@@ -28,8 +28,8 @@ android {
     val base64File = file("${rootDir}/my-upload-key.jks.base64")
     if (base64File.exists()) {
       try {
-        val base64Text = base64File.readText().trim()
-        val decodedBytes = Base64.getDecoder().decode(base64Text)
+        val base64Text = base64File.readText().replace("\\s".toRegex(), "")
+        val decodedBytes = Base64.getMimeDecoder().decode(base64Text)
         keystoreFile.writeBytes(decodedBytes)
       } catch (e: Exception) {
         println("Warning: Failed to reconstruct my-upload-key.jks from base64: ${e.message}")
