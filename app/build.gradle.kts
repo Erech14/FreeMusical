@@ -16,8 +16,8 @@ android {
     applicationId = "erech14.freemusical.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 33
-    versionName = "2.1"
+    versionCode = 34
+    versionName = "2.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

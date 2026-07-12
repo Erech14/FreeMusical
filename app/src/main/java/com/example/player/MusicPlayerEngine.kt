@@ -116,7 +116,10 @@ object MusicPlayerEngine {
             _currentPosition.value = 0L
 
             player.setOnCompletionListener {
-                playNext(context)
+                scope.launch {
+                    delay(150)
+                    playNext(context)
+                }
             }
 
             player.setOnErrorListener { _, what, extra ->
@@ -205,6 +208,7 @@ object MusicPlayerEngine {
             try {
                 player.seekTo(positionMs.toInt())
                 _currentPosition.value = positionMs
+                updateMediaSessionState()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -234,11 +238,13 @@ object MusicPlayerEngine {
     private var audioManager: android.media.AudioManager? = null
     private var focusRequest: android.media.AudioFocusRequest? = null
     private var wasPlayingBeforeFocusLoss = false
+    private var hasAudioFocus = false
 
     private val focusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { focusChange ->
         val context = appContext ?: return@OnAudioFocusChangeListener
         when (focusChange) {
             android.media.AudioManager.AUDIOFOCUS_GAIN -> {
+                hasAudioFocus = true
                 if (wasPlayingBeforeFocusLoss) {
                     wasPlayingBeforeFocusLoss = false
                     mediaPlayer?.let { player ->
@@ -256,6 +262,7 @@ object MusicPlayerEngine {
                 }
             }
             android.media.AudioManager.AUDIOFOCUS_LOSS -> {
+                hasAudioFocus = false
                 wasPlayingBeforeFocusLoss = false
                 mediaPlayer?.let { player ->
                     if (player.isPlaying) {
@@ -268,6 +275,7 @@ object MusicPlayerEngine {
             }
             android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
             android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                hasAudioFocus = false
                 wasPlayingBeforeFocusLoss = _isPlaying.value
                 if (wasPlayingBeforeFocusLoss) {
                     mediaPlayer?.let { player ->
@@ -284,6 +292,7 @@ object MusicPlayerEngine {
     }
 
     private fun requestAudioFocus(context: Context): Boolean {
+        if (hasAudioFocus) return true
         if (appContext == null) {
             appContext = context.applicationContext
         }
@@ -292,7 +301,7 @@ object MusicPlayerEngine {
         }
         val am = audioManager ?: return false
 
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        val granted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val playbackAttributes = android.media.AudioAttributes.Builder()
                 .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -314,6 +323,10 @@ object MusicPlayerEngine {
                 android.media.AudioManager.AUDIOFOCUS_GAIN
             ) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         }
+        if (granted) {
+            hasAudioFocus = true
+        }
+        return granted
     }
 
     private fun abandonAudioFocus() {
@@ -324,6 +337,7 @@ object MusicPlayerEngine {
             @Suppress("DEPRECATION")
             am.abandonAudioFocus(focusChangeListener)
         }
+        hasAudioFocus = false
     }
 
     private fun initMediaSessionIfNeeded(context: Context) {
@@ -371,16 +385,22 @@ object MusicPlayerEngine {
         mediaSession?.setMetadata(metadataBuilder.build())
     }
 
-    private fun updateMediaSessionState(state: Int) {
+    private fun updateMediaSessionState(state: Int? = null) {
+        val currentState = state ?: if (_isPlaying.value) {
+            android.media.session.PlaybackState.STATE_PLAYING
+        } else {
+            android.media.session.PlaybackState.STATE_PAUSED
+        }
         val playbackStateBuilder = android.media.session.PlaybackState.Builder()
             .setActions(
                 android.media.session.PlaybackState.ACTION_PLAY or
                 android.media.session.PlaybackState.ACTION_PAUSE or
                 android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT or
                 android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS or
-                android.media.session.PlaybackState.ACTION_PLAY_PAUSE
+                android.media.session.PlaybackState.ACTION_PLAY_PAUSE or
+                android.media.session.PlaybackState.ACTION_SEEK_TO
             )
-            .setState(state, mediaPlayer?.currentPosition?.toLong() ?: 0L, 1.0f)
+            .setState(currentState, mediaPlayer?.currentPosition?.toLong() ?: 0L, 1.0f)
         
         mediaSession?.setPlaybackState(playbackStateBuilder.build())
     }
