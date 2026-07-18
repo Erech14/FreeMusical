@@ -30,45 +30,17 @@ fun NetworkScreen(viewModel: MusicViewModel, language: String, isDark: Boolean) 
     val apiTracks by viewModel.apiTracks.collectAsStateWithLifecycle()
     val isApiLoading by viewModel.isApiLoading.collectAsStateWithLifecycle()
     
-    var tokenInput by remember { mutableStateOf(apiToken) }
+    LaunchedEffect(apiToken) {
+        if (apiToken.isNotEmpty()) {
+            viewModel.fetchApiTracks()
+        }
+    }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = "API Token",
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            color = contentColor,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextField(
-                value = tokenInput,
-                onValueChange = { tokenInput = it },
-                modifier = Modifier.weight(1f).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                    unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = { viewModel.setApiToken(tokenInput) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270))) {
-                Text("Save")
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Server Tracks", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = contentColor)
             IconButton(onClick = { viewModel.fetchApiTracks() }, enabled = !isApiLoading && apiToken.isNotEmpty()) {

@@ -844,6 +844,50 @@ fun MainScreen(
 
                                         Spacer(modifier = Modifier.height(24.dp))
 
+                                        // API TOKEN CONFIGURATION
+                                        Text(
+                                            text = Strings.get("api_token_title", language),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp,
+                                            color = contentColor,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+
+                                        val apiToken by viewModel.apiToken.collectAsStateWithLifecycle()
+                                        var tokenInput by remember(apiToken) { mutableStateOf(apiToken) }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            TextField(
+                                                value = tokenInput,
+                                                onValueChange = { tokenInput = it },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                                colors = TextFieldDefaults.colors(
+                                                    focusedTextColor = Color.White,
+                                                    unfocusedTextColor = Color.White,
+                                                    focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                    focusedIndicatorColor = Color.Transparent,
+                                                    unfocusedIndicatorColor = Color.Transparent
+                                                ),
+                                                shape = RoundedCornerShape(12.dp),
+                                                singleLine = true
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Button(
+                                                onClick = { viewModel.setApiToken(tokenInput) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270))
+                                            ) {
+                                                Text(Strings.get("save", language), fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(24.dp))
+
                                         // SPECIAL MANAGE CHANNELS SECTION
                                         // "Кроме как из меню настроек" - We can delete ANY playlist (including "Главный" / "Main") from here!
                                         Text(

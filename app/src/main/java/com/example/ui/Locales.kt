@@ -45,7 +45,9 @@ object Strings {
             "choose_audio" to "Choose an audio track",
             "theme_dark" to "Dark",
             "theme_light" to "Light",
-            "theme_system" to "System (Default)"
+            "theme_system" to "System (Default)",
+            "api_token_title" to "API Token",
+            "save" to "Save"
         ),
         "Russian" to mapOf(
             "tab_main" to "Главная",
@@ -86,7 +88,9 @@ object Strings {
             "choose_audio" to "Выберите аудиозапись",
             "theme_dark" to "Тёмная",
             "theme_light" to "Светлая",
-            "theme_system" to "Как в системе (По умолчанию)"
+            "theme_system" to "Как в системе (По умолчанию)",
+            "api_token_title" to "API Токен",
+            "save" to "Сохранить"
         ),
         "Cute Russian" to mapOf(
             "tab_main" to "Главная ^_^",
@@ -127,7 +131,9 @@ object Strings {
             "choose_audio" to "Выберите аудиозапиську",
             "theme_dark" to "Темненькая",
             "theme_light" to "Светленькая",
-            "theme_system" to "Как в системке (По умолчанному)"
+            "theme_system" to "Как в системке (По умолчанному)",
+            "api_token_title" to "Апи Токенчик :3",
+            "save" to "Сохранить ^_^"
         )
     )
 }
