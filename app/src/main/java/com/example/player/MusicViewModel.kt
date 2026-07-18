@@ -100,6 +100,9 @@ class MusicViewModel(
                 _apiTracks.value = tracks
             } catch (e: Exception) {
                 e.printStackTrace()
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Failed to load tracks: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                }
             } finally {
                 _isApiLoading.value = false
             }
