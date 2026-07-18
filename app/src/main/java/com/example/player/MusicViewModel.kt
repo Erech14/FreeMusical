@@ -92,18 +92,26 @@ class MusicViewModel(
     val isApiLoading = _isApiLoading.asStateFlow()
 
     fun fetchApiTracks() {
-        if (_apiToken.value.isEmpty()) return
+        if (_apiToken.value.isEmpty()) {
+            com.example.ui.Logger.log("fetchApiTracks: API Token is empty. Aborting.")
+            return
+        }
+        com.example.ui.Logger.log("fetchApiTracks: Starting fetch with token length: ${_apiToken.value.length}")
         viewModelScope.launch {
             _isApiLoading.value = true
             try {
+                com.example.ui.Logger.log("fetchApiTracks: Calling ApiClient.apiService.getTracks()")
                 val tracks = com.example.api.ApiClient.apiService.getTracks("Bearer ${_apiToken.value}")
+                com.example.ui.Logger.log("fetchApiTracks: Success! Received ${tracks.size} tracks.")
                 _apiTracks.value = tracks
             } catch (e: Exception) {
+                com.example.ui.Logger.log("fetchApiTracks: Exception caught -> ${e.message}")
                 e.printStackTrace()
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "Failed to load tracks: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }
             } finally {
+                com.example.ui.Logger.log("fetchApiTracks: Finished loading.")
                 _isApiLoading.value = false
             }
         }

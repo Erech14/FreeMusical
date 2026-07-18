@@ -104,6 +104,10 @@ fun MainScreen(
     var uploadForRussia by remember { mutableStateOf("yes") }
     var uploadUnder18 by remember { mutableStateOf("no") }
 
+    var showLogScreen by remember { mutableStateOf(false) }
+    var settingsClickCount by remember { mutableStateOf(0) }
+    var lastSettingsClickTime by remember { mutableStateOf(0L) }
+
     val playlistCreatorLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -206,6 +210,10 @@ fun MainScreen(
             },
             modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
         )
+    }
+
+    if (showLogScreen) {
+        LogScreen(onBack = { showLogScreen = false })
     }
 
     if (trackToUpload != null) {
@@ -1012,7 +1020,22 @@ fun MainScreen(
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clickable { selectedTab = index }
+                                    .clickable {
+                                        selectedTab = index
+                                        if (index == 2) {
+                                            val currentTime = System.currentTimeMillis()
+                                            if (currentTime - lastSettingsClickTime < 500) {
+                                                settingsClickCount++
+                                                if (settingsClickCount >= 5) {
+                                                    showLogScreen = true
+                                                    settingsClickCount = 0
+                                                }
+                                            } else {
+                                                settingsClickCount = 1
+                                            }
+                                            lastSettingsClickTime = currentTime
+                                        }
+                                    }
                                     .padding(vertical = 4.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
