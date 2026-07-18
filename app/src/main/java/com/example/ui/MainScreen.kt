@@ -1,4 +1,5 @@
 package com.example.ui
+import androidx.compose.ui.text.font.FontFamily
 
 import android.net.Uri
 import android.os.Build
@@ -104,10 +105,6 @@ fun MainScreen(
     var uploadForRussia by remember { mutableStateOf("yes") }
     var uploadUnder18 by remember { mutableStateOf("no") }
 
-    var showLogScreen by remember { mutableStateOf(false) }
-    var settingsClickCount by remember { mutableStateOf(0) }
-    var lastSettingsClickTime by remember { mutableStateOf(0L) }
-
     val playlistCreatorLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -210,10 +207,6 @@ fun MainScreen(
             },
             modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
         )
-    }
-
-    if (showLogScreen) {
-        LogScreen(onBack = { showLogScreen = false })
     }
 
     if (trackToUpload != null) {
@@ -947,6 +940,46 @@ fun MainScreen(
                                                     }
                                                 }
                                             }
+                                            item {
+                                                Spacer(modifier = Modifier.height(32.dp))
+                                                Text(
+                                                    text = "Application Logs",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                )
+                                                val logs by com.example.ui.Logger.logs.collectAsStateWithLifecycle()
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text("${logs.size} log entries", color = Color.Gray, fontSize = 12.sp)
+                                                    TextButton(onClick = { com.example.ui.Logger.clear() }) {
+                                                        Text("Clear Logs", color = Color(0xFFFF453A))
+                                                    }
+                                                }
+                                                if (logs.isNotEmpty()) {
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                                            .padding(12.dp)
+                                                    ) {
+                                                        logs.takeLast(100).forEach { logMsg ->
+                                                            Text(
+                                                                text = logMsg,
+                                                                color = Color.Green,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                fontSize = 10.sp,
+                                                                modifier = Modifier.padding(vertical = 4.dp)
+                                                            )
+                                                            Divider(color = Color.DarkGray, thickness = 0.5.dp)
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1020,22 +1053,7 @@ fun MainScreen(
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clickable {
-                                        selectedTab = index
-                                        if (index == 2) {
-                                            val currentTime = System.currentTimeMillis()
-                                            if (currentTime - lastSettingsClickTime < 500) {
-                                                settingsClickCount++
-                                                if (settingsClickCount >= 5) {
-                                                    showLogScreen = true
-                                                    settingsClickCount = 0
-                                                }
-                                            } else {
-                                                settingsClickCount = 1
-                                            }
-                                            lastSettingsClickTime = currentTime
-                                        }
-                                    }
+                                    .clickable { selectedTab = index }
                                     .padding(vertical = 4.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
