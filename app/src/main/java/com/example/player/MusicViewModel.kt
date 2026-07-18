@@ -18,6 +18,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class MusicViewModel(
     private val context: Context,
@@ -71,6 +75,137 @@ class MusicViewModel(
 
     private val _appLanguage = MutableStateFlow(prefs.getString("app_language", "Cute Russian") ?: "Cute Russian")
     val appLanguage = _appLanguage.asStateFlow()
+
+    private val _apiToken = MutableStateFlow(prefs.getString("api_token", "") ?: "")
+    val apiToken = _apiToken.asStateFlow()
+
+    fun setApiToken(token: String) {
+        prefs.edit().putString("api_token", token).apply()
+        _apiToken.value = token
+    }
+
+    // API logic
+    private val _apiTracks = MutableStateFlow<List<com.example.api.TrackRemote>>(emptyList())
+    val apiTracks = _apiTracks.asStateFlow()
+
+    private val _isApiLoading = MutableStateFlow(false)
+    val isApiLoading = _isApiLoading.asStateFlow()
+
+    fun fetchApiTracks() {
+        if (_apiToken.value.isEmpty()) return
+        viewModelScope.launch {
+            _isApiLoading.value = true
+            try {
+                val tracks = com.example.api.ApiClient.apiService.getTracks("Bearer ${_apiToken.value}")
+                _apiTracks.value = tracks
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isApiLoading.value = false
+            }
+        }
+    }
+
+    fun downloadApiTrack(track: com.example.api.TrackRemote) {
+        val folderUriStr = _selectedFolderUri.value ?: return
+        if (_apiToken.value.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                val response = com.example.api.ApiClient.apiService.downloadTrack("Bearer ${_apiToken.value}", track.id)
+                if (response.isSuccessful) {
+                    val body = response.body() ?: return@launch
+                    val uri = Uri.parse(folderUriStr)
+                    val rootDocId = android.provider.DocumentsContract.getTreeDocumentId(uri)
+                    val dirUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(uri, rootDocId)
+                    
+                    // Determine next track number
+                    val existing = tracksState.value.map { it.fileName }
+                    var maxNum = 0
+                    val regex = Regex("^(\\d{3})_.*")
+                    for (name in existing) {
+                        val match = regex.find(name)
+                        if (match != null) {
+                            val num = match.groupValues[1].toIntOrNull() ?: 0
+                            if (num > maxNum) maxNum = num
+                        }
+                    }
+                    val nextNum = maxNum + 1
+                    
+                    // Format file name
+                    val artistNames = track.artists.joinToString("_") { it.name }.replace("/", "-")
+                    val title = track.title.replace("/", "-")
+                    val fileName = String.format("%03d_%s_%s.mp3", nextNum, artistNames, title)
+                    
+                    val newFileUri = android.provider.DocumentsContract.createDocument(
+                        context.contentResolver,
+                        dirUri,
+                        "audio/mpeg",
+                        fileName
+                    )
+                    
+                    if (newFileUri != null) {
+                        context.contentResolver.openOutputStream(newFileUri)?.use { out ->
+                            body.byteStream().use { input ->
+                                input.copyTo(out)
+                            }
+                        }
+                        // Refresh directory
+                        scanDirectory(uri)
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, "Track downloaded: $fileName", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Download failed", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Download error: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    fun uploadLocalTrack(track: Track, artists: String, title: String, forRussia: String, under18: String) {
+        if (_apiToken.value.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                val uri = Uri.parse(track.uriString)
+                val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
+                val bytes = inputStream.readBytes()
+                val audioMediaType = "audio/mpeg".toMediaTypeOrNull()
+                val textMediaType = "text/plain".toMediaTypeOrNull()
+
+                val requestBody = bytes.toRequestBody(audioMediaType)
+                val part = okhttp3.MultipartBody.Part.createFormData("file", track.fileName, requestBody)
+                
+                val titleBody = title.toRequestBody(textMediaType)
+                val artistsBody = artists.toRequestBody(textMediaType)
+                val forRussiaBody = forRussia.toRequestBody(textMediaType)
+                val under18Body = under18.toRequestBody(textMediaType)
+                
+                com.example.api.ApiClient.apiService.uploadTrack(
+                    "Bearer ${_apiToken.value}",
+                    part,
+                    titleBody,
+                    artistsBody,
+                    forRussiaBody,
+                    under18Body
+                )
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Upload successful", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Upload failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     fun setAppTheme(theme: Int) {
         prefs.edit().putInt("app_theme", theme).apply()

@@ -97,6 +97,12 @@ fun MainScreen(
     var showPlaylistNameDialog by remember { mutableStateOf(false) }
     var pendingPlaylistUri by remember { mutableStateOf<Uri?>(null) }
     var newPlaylistName by remember { mutableStateOf("") }
+    
+    var trackToUpload by remember { mutableStateOf<Track?>(null) }
+    var uploadTitle by remember { mutableStateOf("") }
+    var uploadArtists by remember { mutableStateOf("") }
+    var uploadForRussia by remember { mutableStateOf("yes") }
+    var uploadUnder18 by remember { mutableStateOf("no") }
 
     val playlistCreatorLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -202,6 +208,56 @@ fun MainScreen(
         )
     }
 
+    if (trackToUpload != null) {
+        AlertDialog(
+            onDismissRequest = { trackToUpload = null },
+            confirmButton = {
+                TextButton(onClick = {
+                    trackToUpload?.let {
+                        viewModel.uploadLocalTrack(it, uploadArtists, uploadTitle, uploadForRussia, uploadUnder18)
+                    }
+                    trackToUpload = null
+                }) {
+                    Text("Upload", color = Color(0xFF00F5D4), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { trackToUpload = null }) {
+                    Text(Strings.get("cancel", language), color = Color.White.copy(alpha = 0.6f), fontSize = 16.sp)
+                }
+            },
+            containerColor = Color(0xFF1C1D22),
+            title = { Text("Upload Track", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    TextField(
+                        value = uploadTitle,
+                        onValueChange = { uploadTitle = it },
+                        placeholder = { Text("Title", color = Color.Gray) },
+                        colors = TextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedContainerColor = Color.White.copy(alpha = 0.08f), unfocusedContainerColor = Color.White.copy(alpha = 0.08f))
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextField(
+                        value = uploadArtists,
+                        onValueChange = { uploadArtists = it },
+                        placeholder = { Text("Artists", color = Color.Gray) },
+                        colors = TextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedContainerColor = Color.White.copy(alpha = 0.08f), unfocusedContainerColor = Color.White.copy(alpha = 0.08f))
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = uploadForRussia == "yes", onCheckedChange = { uploadForRussia = if (it) "yes" else "no" })
+                        Text("For Russia", color = Color.White)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = uploadUnder18 == "no", onCheckedChange = { uploadUnder18 = if (it) "no" else "yes" })
+                        Text("18+", color = Color.White)
+                    }
+                }
+            },
+            modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
+        )
+    }
+
     // Deep glowing sea-violet backdrop gradient for Dark, pure white for Light (high contrast)
     val backgroundStyleColors = if (isDark) {
         listOf(Color(0xFF171329), Color(0xFF0B2B28))
@@ -223,7 +279,12 @@ fun MainScreen(
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                imageVector = if (selectedTab == 0) Icons.Default.MusicNote else if (selectedTab == 1) Icons.Default.QueueMusic else Icons.Default.Settings,
+                                imageVector = when (selectedTab) {
+                                    0 -> Icons.Default.MusicNote
+                                    1 -> Icons.Default.QueueMusic
+                                    2 -> Icons.Default.Settings
+                                    else -> Icons.Default.CloudDownload
+                                },
                                 contentDescription = null,
                                 tint = if (isDark) Color(0xFF00F5D4) else MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(end = 8.dp)
@@ -232,7 +293,8 @@ fun MainScreen(
                                 text = when (selectedTab) {
                                     0 -> Strings.get("app_name", language)
                                     1 -> Strings.get("tab_playlists", language)
-                                    else -> Strings.get("tab_settings", language)
+                                    2 -> Strings.get("tab_settings", language)
+                                    else -> Strings.get("tab_network", language)
                                 },
                                 color = contentColor,
                                 fontWeight = FontWeight.Bold,
@@ -527,6 +589,11 @@ fun MainScreen(
                                                         isCurrent = currentTrack?.uriString == track.uriString,
                                                         isPlaying = isPlaying && currentTrack?.uriString == track.uriString,
                                                         onClick = { viewModel.playTrack(track) },
+                                                        onUploadClick = {
+                                                            uploadTitle = track.title
+                                                            uploadArtists = track.artist
+                                                            trackToUpload = track
+                                                        },
                                                         style = 2 // Lock to Glassmorphism
                                                     )
                                                 }
@@ -652,7 +719,7 @@ fun MainScreen(
                                         }
                                     }
                                 }
-                                else -> {
+                                2 -> {
                                     // ТАБ 2: НАСТРОЙКИ (Settings screen)
                                     Column(
                                         modifier = Modifier
@@ -831,6 +898,9 @@ fun MainScreen(
                                         }
                                     }
                                 }
+                                else -> {
+                                    NetworkScreen(viewModel = viewModel, language = language, isDark = isDark)
+                                }
                             }
                         }
                     }
@@ -889,7 +959,8 @@ fun MainScreen(
                         val tabLabels = listOf(
                             Strings.get("tab_main", language) to Icons.Default.MusicNote,
                             Strings.get("tab_playlists", language) to Icons.Default.QueueMusic,
-                            Strings.get("tab_settings", language) to Icons.Default.Settings
+                            Strings.get("tab_settings", language) to Icons.Default.Settings,
+                            Strings.get("tab_network", language) to Icons.Default.CloudDownload
                         )
 
                         tabLabels.forEachIndexed { index, (label, icon) ->
@@ -1550,6 +1621,7 @@ fun TrackItemRow(
     isCurrent: Boolean,
     isPlaying: Boolean,
     onClick: () -> Unit,
+    onUploadClick: () -> Unit = {},
     style: Int
 ) {
     val context = LocalContext.current
@@ -1673,6 +1745,10 @@ fun TrackItemRow(
                         fontWeight = FontWeight.Normal
                     )
                 }
+            }
+            
+            IconButton(onClick = onUploadClick) {
+                Icon(Icons.Default.Upload, contentDescription = "Upload", tint = Color(0xFF00F5D4))
             }
         }
 
