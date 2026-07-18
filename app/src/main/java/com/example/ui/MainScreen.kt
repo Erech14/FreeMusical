@@ -247,11 +247,11 @@ fun MainScreen(
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = uploadForRussia == "yes", onCheckedChange = { uploadForRussia = if (it) "yes" else "no" })
-                        Text("For Russia", color = Color.White)
+                        Text("Трек предназначен для России (выполнен закон о запрете пропаганды наркотиков в медиа)", color = Color.White, fontSize = 12.sp, lineHeight = 14.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = uploadUnder18 == "no", onCheckedChange = { uploadUnder18 = if (it) "no" else "yes" })
-                        Text("18+", color = Color.White)
+                        Text("Трек предназначен для лиц младше 18 лет", color = Color.White, fontSize = 12.sp, lineHeight = 14.sp)
                     }
                 }
             },
