@@ -1,8 +1,9 @@
+
 package com.example.ui
-import androidx.compose.ui.text.font.FontFamily
 
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -10,9 +11,9 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,37 +26,50 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.Image
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.content.Context
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.ImageBitmap
+import com.example.data.Track
+import com.example.ui.components.*
+import com.example.ui.components.RotatingVinyl
+import com.example.player.MusicViewModel
+import java.io.File
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+
+import androidx.compose.ui.platform.testTag
+import com.example.ui.theme.*
+import com.example.player.*
 import android.media.MediaMetadataRetriever
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.example.R
-import com.example.data.Track
-import com.example.player.MusicViewModel
-import com.example.ui.components.RotatingVinyl
-import com.example.ui.theme.*
-
+import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.content.Context
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.Image
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -68,7 +82,6 @@ fun MainScreen(
     val tracks by viewModel.tracksState.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val scanCount by viewModel.scanCount.collectAsStateWithLifecycle()
-
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
@@ -78,23 +91,18 @@ fun MainScreen(
     val language by viewModel.appLanguage.collectAsStateWithLifecycle()
     val appStyle by viewModel.appStyle.collectAsStateWithLifecycle()
     val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
-
     val isDark = when (appTheme) {
         0 -> true
         1 -> false
         else -> isSystemInDarkTheme()
     }
-
     val contentColor = if (isDark) Color.White else Color.Black
     val secondaryContentColor = if (isDark) Color.LightGray else Color(0xFF111115)
-
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val defaultPlaylistId by viewModel.defaultPlaylistId.collectAsStateWithLifecycle()
-
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var isPlayerDetailedOpened by remember { mutableStateOf(false) }
-
     var showPlaylistNameDialog by remember { mutableStateOf(false) }
     var pendingPlaylistUri by remember { mutableStateOf<Uri?>(null) }
     var newPlaylistName by remember { mutableStateOf("") }
@@ -104,7 +112,6 @@ fun MainScreen(
     var uploadArtists by remember { mutableStateOf("") }
     var uploadForRussia by remember { mutableStateOf("yes") }
     var uploadUnder18 by remember { mutableStateOf("no") }
-
     val playlistCreatorLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -118,7 +125,6 @@ fun MainScreen(
             showPlaylistNameDialog = true
         }
     }
-
     // Launcher for general directory picker
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -127,14 +133,12 @@ fun MainScreen(
             viewModel.selectFolder(uri)
         }
     }
-
     // Storage permission launcher depending on SDK
     val permissionString = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         android.Manifest.permission.READ_MEDIA_AUDIO
     } else {
         android.Manifest.permission.READ_EXTERNAL_STORAGE
     }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -147,7 +151,6 @@ fun MainScreen(
             }
         }
     }
-
     // Check permission on startup
     LaunchedEffect(Unit) {
         val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -157,12 +160,10 @@ fun MainScreen(
         }
         viewModel.setPermissionGranted(hasPermission)
     }
-
     // Identify if current folder is the "Главный" / "Main" playlist
     val isCurrentMainPlaylist = remember(playlists, selectedFolderUri) {
         playlists.any { (it.name == "Главный" || it.name == "Main" || it.name == "Главный :3") && it.uri == selectedFolderUri }
     }
-
     if (showPlaylistNameDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -208,7 +209,6 @@ fun MainScreen(
             modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
         )
     }
-
     if (trackToUpload != null) {
         AlertDialog(
             onDismissRequest = { trackToUpload = null },
@@ -250,7 +250,7 @@ fun MainScreen(
                         Text("Трек предназначен для России (выполнен закон о запрете пропаганды наркотиков в медиа)", color = Color.White, fontSize = 12.sp, lineHeight = 14.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = uploadUnder18 == "no", onCheckedChange = { uploadUnder18 = if (it) "no" else "yes" })
+                        Checkbox(checked = uploadUnder18 == "yes", onCheckedChange = { uploadUnder18 = if (it) "yes" else "no" })
                         Text("Трек предназначен для лиц младше 18 лет", color = Color.White, fontSize = 12.sp, lineHeight = 14.sp)
                     }
                 }
@@ -258,14 +258,12 @@ fun MainScreen(
             modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
         )
     }
-
     // Deep glowing sea-violet backdrop gradient for Dark, pure white for Light (high contrast)
     val backgroundStyleColors = if (isDark) {
         listOf(Color(0xFF171329), Color(0xFF0B2B28))
     } else {
         listOf(Color.White, Color.White)
     }
-
     Box(modifier = Modifier.fillMaxSize().background(Brush.linearGradient(backgroundStyleColors))) {
         Scaffold(
             modifier = modifier
@@ -403,7 +401,6 @@ fun MainScreen(
                                                 )
                                             }
                                         }
-
                                         // Search and Sync row with glass style
                                         Row(
                                             modifier = Modifier
@@ -456,9 +453,7 @@ fun MainScreen(
                                                 ),
                                                 singleLine = true
                                             )
-
                                             Spacer(modifier = Modifier.width(8.dp))
-
                                             IconButton(
                                                 onClick = {
                                                     val uri = Uri.parse(selectedFolderUri!!)
@@ -486,7 +481,6 @@ fun MainScreen(
                                                 }
                                             }
                                         }
-
                                         // Play actions row
                                         Row(
                                             modifier = Modifier
@@ -513,9 +507,7 @@ fun MainScreen(
                                                 Text(Strings.get("play_shuffle", language), fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                             }
                                         }
-
                                         Spacer(modifier = Modifier.height(4.dp))
-
                                         if (isScanning && tracks.isEmpty()) {
                                             Box(
                                                 modifier = Modifier
@@ -579,7 +571,6 @@ fun MainScreen(
                                                     }
                                                 }
                                             }
-
                                             LazyColumn(
                                                 modifier = Modifier.weight(1f),
                                                 contentPadding = PaddingValues(bottom = 160.dp) // Large space to float custom navigation
@@ -632,9 +623,7 @@ fun MainScreen(
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(Strings.get("create_playlist", language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         }
-
                                         Spacer(modifier = Modifier.height(16.dp))
-
                                         LazyColumn(
                                             modifier = Modifier.weight(1f),
                                             contentPadding = PaddingValues(bottom = 160.dp)
@@ -642,7 +631,6 @@ fun MainScreen(
                                             items(playlists) { playlist ->
                                                 val isMainPlaylist = playlist.name == "Главный" || playlist.name == "Main" || playlist.name == "Главный :3"
                                                 val isActive = selectedFolderUri == playlist.uri
-
                                                 Card(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
@@ -702,7 +690,6 @@ fun MainScreen(
                                                                 modifier = Modifier.size(24.dp)
                                                             )
                                                         }
-
                                                         // HIDE delete button completely on the Playlists Tab for "Главный" / "Main" playlist
                                                         if (!isMainPlaylist) {
                                                             IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
@@ -722,261 +709,285 @@ fun MainScreen(
                                 }
                                 2 -> {
                                     // ТАБ 2: НАСТРОЙКИ (Settings screen)
-                                    Column(
+                                    val currentThemeVal by viewModel.appTheme.collectAsStateWithLifecycle()
+                                    var themeExpanded by remember { mutableStateOf(false) }
+                                    val themeOptions = listOf(0, 1, 2)
+                                    val currentThemeLabel = when (currentThemeVal) {
+                                        0 -> Strings.get("theme_dark", language)
+                                        1 -> Strings.get("theme_light", language)
+                                        else -> Strings.get("theme_system", language)
+                                    }
+                                    var langExpanded by remember { mutableStateOf(false) }
+                                    val languages = listOf("Russian", "Cute Russian", "English")
+                                    val apiToken by viewModel.apiToken.collectAsStateWithLifecycle()
+                                    var tokenInput by remember(apiToken) { mutableStateOf(apiToken) }
+                                    
+                                    val logs by com.example.ui.Logger.logs.collectAsStateWithLifecycle()
+                                    var logMenuExpanded by remember { mutableStateOf(false) }
+                                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                                    val context = androidx.compose.ui.platform.LocalContext.current
+                                    LazyColumn(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        contentPadding = PaddingValues(bottom = 160.dp)
                                     ) {
-                                        Text(
-                                            text = Strings.get("appearance", language),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 20.sp,
-                                            color = contentColor,
-                                            modifier = Modifier.padding(bottom = 12.dp)
-                                        )
-
-                                        // THEME SELECTOR DROPDOWN
-                                        val currentThemeVal by viewModel.appTheme.collectAsStateWithLifecycle()
-                                        var themeExpanded by remember { mutableStateOf(false) }
-                                        val themeOptions = listOf(0, 1, 2)
-                                        val currentThemeLabel = when (currentThemeVal) {
-                                            0 -> Strings.get("theme_dark", language)
-                                            1 -> Strings.get("theme_light", language)
-                                            else -> Strings.get("theme_system", language)
-                                        }
-
-                                        ExposedDropdownMenuBox(
-                                            expanded = themeExpanded,
-                                            onExpandedChange = { themeExpanded = it },
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                        ) {
-                                            TextField(
-                                                value = currentThemeLabel,
-                                                onValueChange = {},
-                                                readOnly = true,
-                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
-                                                colors = TextFieldDefaults.colors(
-                                                    focusedTextColor = Color.White,
-                                                    unfocusedTextColor = Color.White,
-                                                    focusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                    focusedIndicatorColor = Color.Transparent,
-                                                    unfocusedIndicatorColor = Color.Transparent
-                                                ),
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                                    .menuAnchor()
+                                        item {
+                                            Text(
+                                                text = Strings.get("appearance", language),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 20.sp,
+                                                color = contentColor,
+                                                modifier = Modifier.padding(bottom = 12.dp)
                                             )
-                                            ExposedDropdownMenu(
+                                            ExposedDropdownMenuBox(
                                                 expanded = themeExpanded,
-                                                onDismissRequest = { themeExpanded = false },
-                                                modifier = Modifier.background(Color(0xFF1E1F24))
+                                                onExpandedChange = { themeExpanded = it },
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                             ) {
-                                                themeOptions.forEach { themeId ->
-                                                    val optionLabel = when (themeId) {
-                                                        0 -> Strings.get("theme_dark", language)
-                                                        1 -> Strings.get("theme_light", language)
-                                                        else -> Strings.get("theme_system", language)
-                                                    }
-                                                    DropdownMenuItem(
-                                                        text = { Text(optionLabel, color = Color.White, fontWeight = FontWeight.Bold) },
-                                                        onClick = {
-                                                            viewModel.setAppTheme(themeId)
-                                                            themeExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(16.dp))
-
-                                        // LANGUAGE SELECTOR
-                                        Text(
-                                            text = Strings.get("language", language),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp,
-                                            color = contentColor,
-                                            modifier = Modifier.padding(bottom = 8.dp)
-                                        )
-
-                                        var langExpanded by remember { mutableStateOf(false) }
-                                        val languages = listOf("Russian", "Cute Russian", "English")
-                                        ExposedDropdownMenuBox(
-                                            expanded = langExpanded,
-                                            onExpandedChange = { langExpanded = it },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            TextField(
-                                                value = language.takeIf { languages.contains(it) } ?: "Russian",
-                                                onValueChange = {},
-                                                readOnly = true,
-                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
-                                                colors = TextFieldDefaults.colors(
-                                                    focusedTextColor = Color.White,
-                                                    unfocusedTextColor = Color.White,
-                                                    focusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                    focusedIndicatorColor = Color.Transparent,
-                                                    unfocusedIndicatorColor = Color.Transparent
-                                                ),
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                                    .menuAnchor()
-                                            )
-                                            ExposedDropdownMenu(
-                                                expanded = langExpanded,
-                                                onDismissRequest = { langExpanded = false },
-                                                modifier = Modifier.background(Color(0xFF1E1F24))
-                                            ) {
-                                                languages.forEach { selectionOption ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(selectionOption, color = Color.White, fontWeight = FontWeight.Bold) },
-                                                        onClick = {
-                                                            viewModel.setAppLanguage(selectionOption)
-                                                            langExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(24.dp))
-
-                                        // API TOKEN CONFIGURATION
-                                        Text(
-                                            text = Strings.get("api_token_title", language),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp,
-                                            color = contentColor,
-                                            modifier = Modifier.padding(bottom = 8.dp)
-                                        )
-
-                                        val apiToken by viewModel.apiToken.collectAsStateWithLifecycle()
-                                        var tokenInput by remember(apiToken) { mutableStateOf(apiToken) }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            TextField(
-                                                value = tokenInput,
-                                                onValueChange = { tokenInput = it },
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                                                colors = TextFieldDefaults.colors(
-                                                    focusedTextColor = Color.White,
-                                                    unfocusedTextColor = Color.White,
-                                                    focusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                    focusedIndicatorColor = Color.Transparent,
-                                                    unfocusedIndicatorColor = Color.Transparent
-                                                ),
-                                                shape = RoundedCornerShape(12.dp),
-                                                singleLine = true
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Button(
-                                                onClick = { viewModel.setApiToken(tokenInput) },
-                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270))
-                                            ) {
-                                                Text(Strings.get("save", language), fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(24.dp))
-
-                                        // SPECIAL MANAGE CHANNELS SECTION
-                                        // "Кроме как из меню настроек" - We can delete ANY playlist (including "Главный" / "Main") from here!
-                                        Text(
-                                            text = "Управление плейлистами (Настройки)",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp,
-                                            color = contentColor,
-                                            modifier = Modifier.padding(bottom = 8.dp)
-                                        )
-
-                                        LazyColumn(
-                                            modifier = Modifier.weight(1f),
-                                            contentPadding = PaddingValues(bottom = 160.dp)
-                                        ) {
-                                            items(playlists) { playlist ->
-                                                val isMain = playlist.name == "Главный" || playlist.name == "Main" || playlist.name == "Главный :3"
-                                                Card(
+                                                TextField(
+                                                    value = currentThemeLabel,
+                                                    onValueChange = {},
+                                                    readOnly = true,
+                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                                                    colors = TextFieldDefaults.colors(
+                                                        focusedTextColor = Color.White,
+                                                        unfocusedTextColor = Color.White,
+                                                        focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                        unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                        focusedIndicatorColor = Color.Transparent,
+                                                        unfocusedIndicatorColor = Color.Transparent
+                                                    ),
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .padding(vertical = 4.dp)
-                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
+                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                                        .menuAnchor()
+                                                )
+                                                ExposedDropdownMenu(
+                                                    expanded = themeExpanded,
+                                                    onDismissRequest = { themeExpanded = false },
+                                                    modifier = Modifier.background(Color(0xFF1E1F24))
                                                 ) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                                Text(playlist.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                                if (isMain) {
-                                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                                    Text("★ Главный", color = Color(0xFF00F5D4), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                                }
+                                                    themeOptions.forEach { themeId ->
+                                                        val optionLabel = when (themeId) {
+                                                            0 -> Strings.get("theme_dark", language)
+                                                            1 -> Strings.get("theme_light", language)
+                                                            else -> Strings.get("theme_system", language)
+                                                        }
+                                                        DropdownMenuItem(
+                                                            text = { Text(optionLabel, color = Color.White, fontWeight = FontWeight.Bold) },
+                                                            onClick = {
+                                                                viewModel.setAppTheme(themeId)
+                                                                themeExpanded = false
                                                             }
-                                                            Text(playlist.uri, color = Color.LightGray, fontSize = 10.sp, maxLines = 1)
-                                                        }
-                                                        
-                                                        // Deleting "Главный" is fully allowed in this settings list context!
-                                                        IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Delete,
-                                                                contentDescription = Strings.get("delete", language),
-                                                                tint = Color(0xFFFF453A),
-                                                                modifier = Modifier.size(20.dp)
-                                                            )
-                                                        }
+                                                        )
                                                     }
                                                 }
                                             }
-                                            item {
-                                                Spacer(modifier = Modifier.height(32.dp))
-                                                Text(
-                                                    text = "Application Logs",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 18.sp,
-                                                    color = contentColor,
-                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            // LANGUAGE SELECTOR
+                                            Text(
+                                                text = Strings.get("language", language),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 18.sp,
+                                                color = contentColor,
+                                                modifier = Modifier.padding(bottom = 8.dp)
+                                            )
+                                            ExposedDropdownMenuBox(
+                                                expanded = langExpanded,
+                                                onExpandedChange = { langExpanded = it },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                TextField(
+                                                    value = language.takeIf { languages.contains(it) } ?: "Russian",
+                                                    onValueChange = {},
+                                                    readOnly = true,
+                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
+                                                    colors = TextFieldDefaults.colors(
+                                                        focusedTextColor = Color.White,
+                                                        unfocusedTextColor = Color.White,
+                                                        focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                        unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                        focusedIndicatorColor = Color.Transparent,
+                                                        unfocusedIndicatorColor = Color.Transparent
+                                                    ),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                                        .menuAnchor()
                                                 )
-                                                val logs by com.example.ui.Logger.logs.collectAsStateWithLifecycle()
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
+                                                ExposedDropdownMenu(
+                                                    expanded = langExpanded,
+                                                    onDismissRequest = { langExpanded = false },
+                                                    modifier = Modifier.background(Color(0xFF1E1F24))
                                                 ) {
-                                                    Text("${logs.size} log entries", color = Color.Gray, fontSize = 12.sp)
-                                                    TextButton(onClick = { com.example.ui.Logger.clear() }) {
-                                                        Text("Clear Logs", color = Color(0xFFFF453A))
+                                                    languages.forEach { selectionOption ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(selectionOption, color = Color.White, fontWeight = FontWeight.Bold) },
+                                                            onClick = {
+                                                                viewModel.setAppLanguage(selectionOption)
+                                                                langExpanded = false
+                                                            }
+                                                        )
                                                     }
                                                 }
-                                                if (logs.isNotEmpty()) {
-                                                    Column(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                                            .padding(12.dp)
-                                                    ) {
-                                                        logs.takeLast(100).forEach { logMsg ->
-                                                            Text(
-                                                                text = logMsg,
-                                                                color = Color.Green,
-                                                                fontFamily = FontFamily.Monospace,
-                                                                fontSize = 10.sp,
-                                                                modifier = Modifier.padding(vertical = 4.dp)
-                                                            )
-                                                            Divider(color = Color.DarkGray, thickness = 0.5.dp)
+                                            }
+                                            Spacer(modifier = Modifier.height(24.dp))
+                                            // API TOKEN CONFIGURATION
+                                            Text(
+                                                text = Strings.get("api_token_title", language),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 18.sp,
+                                                color = contentColor,
+                                                modifier = Modifier.padding(bottom = 8.dp)
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                TextField(
+                                                    value = tokenInput,
+                                                    onValueChange = { tokenInput = it },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                                    colors = TextFieldDefaults.colors(
+                                                        focusedTextColor = Color.White,
+                                                        unfocusedTextColor = Color.White,
+                                                        focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                        unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                        focusedIndicatorColor = Color.Transparent,
+                                                        unfocusedIndicatorColor = Color.Transparent
+                                                    ),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    singleLine = true
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Button(
+                                                    onClick = { viewModel.setApiToken(tokenInput) },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270))
+                                                ) {
+                                                    Text(Strings.get("save", language), fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(24.dp))
+                                            Text(
+                                                text = "Управление плейлистами (Настройки)",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 18.sp,
+                                                color = contentColor,
+                                                modifier = Modifier.padding(bottom = 8.dp)
+                                            )
+                                        }
+                                        
+                                        items(playlists) { playlist ->
+                                            val isMain = playlist.name == "Главный" || playlist.name == "Main" || playlist.name == "Главный :3"
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Text(playlist.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                            if (isMain) {
+                                                                Spacer(modifier = Modifier.width(6.dp))
+                                                                Text("★ Главный", color = Color(0xFF00F5D4), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            }
                                                         }
+                                                        Text(playlist.uri, color = Color.LightGray, fontSize = 10.sp, maxLines = 1)
+                                                    }
+                                                    
+                                                    IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Delete,
+                                                            contentDescription = Strings.get("delete", language),
+                                                            tint = Color(0xFFFF453A),
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        item {
+                                            Spacer(modifier = Modifier.height(32.dp))
+                                            Text(
+                                                text = "Application Logs",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 18.sp,
+                                                color = contentColor,
+                                                modifier = Modifier.padding(bottom = 8.dp)
+                                            )
+                                            
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("${logs.size} log entries", color = Color.Gray, fontSize = 12.sp)
+                                                Box {
+                                                    IconButton(onClick = { logMenuExpanded = true }) {
+                                                        Icon(Icons.Default.MoreVert, contentDescription = "Log Actions", tint = Color.White)
+                                                    }
+                                                    DropdownMenu(
+                                                        expanded = logMenuExpanded,
+                                                        onDismissRequest = { logMenuExpanded = false },
+                                                        modifier = Modifier.background(Color(0xFF1E1F24))
+                                                    ) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Copy to clipboard", color = Color.White) },
+                                                            onClick = { 
+                                                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(logs.joinToString("\n")))
+                                                                android.widget.Toast.makeText(context, "Logs copied!", android.widget.Toast.LENGTH_SHORT).show()
+                                                                logMenuExpanded = false
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Download logs", color = Color.White) },
+                                                            onClick = {
+                                                                try {
+                                                                    val file = java.io.File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "logs.txt")
+                                                                    file.writeText(logs.joinToString("\n"))
+                                                                    android.widget.Toast.makeText(context, "Saved to Downloads/logs.txt", android.widget.Toast.LENGTH_LONG).show()
+                                                                } catch (e: Exception) {
+                                                                    android.widget.Toast.makeText(context, "Failed to save", android.widget.Toast.LENGTH_SHORT).show()
+                                                                }
+                                                                logMenuExpanded = false
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Clear Logs", color = Color(0xFFFF453A)) },
+                                                            onClick = {
+                                                                com.example.ui.Logger.clear()
+                                                                logMenuExpanded = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            if (logs.isNotEmpty()) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                                        .padding(12.dp)
+                                                ) {
+                                                    logs.takeLast(100).forEach { logMsg ->
+                                                        Text(
+                                                            text = logMsg,
+                                                            color = Color.Green,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontSize = 10.sp,
+                                                            modifier = Modifier.padding(vertical = 4.dp)
+                                                        )
+                                                        Divider(color = Color.DarkGray, thickness = 0.5.dp)
                                                     }
                                                 }
                                             }
@@ -992,7 +1003,6 @@ fun MainScreen(
                 }
             }
         }
-
         // Floating custom bottom navigation & player bar stacked vertically
         Box(
             modifier = Modifier
@@ -1032,7 +1042,6 @@ fun MainScreen(
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
-
                     // 2. Navigation Items
                     Row(
                         modifier = Modifier
@@ -1047,7 +1056,6 @@ fun MainScreen(
                             Strings.get("tab_settings", language) to Icons.Default.Settings,
                             Strings.get("tab_network", language) to Icons.Default.CloudDownload
                         )
-
                         tabLabels.forEachIndexed { index, (label, icon) ->
                             val isSelected = selectedTab == index
                             Column(
@@ -1066,12 +1074,32 @@ fun MainScreen(
                                         .background(if (isSelected) Color(0xFF118270).copy(alpha = 0.35f) else Color.Transparent),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = icon,
-                                        contentDescription = label,
-                                        tint = if (isSelected) Color(0xFF00F5D4) else Color(0xFF8E8E93),
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    if (index == 3) {
+                                        BadgedBox(
+                                            badge = {
+                                                Badge(
+                                                    containerColor = Color(0xFF00F5D4),
+                                                    contentColor = Color.Black
+                                                ) {
+                                                    Text("Beta", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = label,
+                                                tint = if (isSelected) Color(0xFF00F5D4) else Color(0xFF8E8E93),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = label,
+                                            tint = if (isSelected) Color(0xFF00F5D4) else Color(0xFF8E8E93),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
@@ -1090,7 +1118,6 @@ fun MainScreen(
                 }
             }
         }
-
         // Expanded full-screen sliding vinyl turntable player sheet
         AnimatedVisibility(
             visible = isPlayerDetailedOpened,
@@ -1127,7 +1154,6 @@ fun MainScreen(
                                 modifier = Modifier.size(32.dp)
                             )
                         }
-
                         Text(
                             text = Strings.get("now_playing", language),
                             color = if (isDark) SoftWhite else Color(0xFF1C1B1F),
@@ -1135,10 +1161,8 @@ fun MainScreen(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.2.sp
                         )
-
                         Spacer(modifier = Modifier.size(48.dp))
                     }
-
                     // detailed Turntable component
                     PlaybackTurntableDeck(
                         currentTrack = currentTrack,
@@ -1155,14 +1179,12 @@ fun MainScreen(
                         style = 2, // Lock to Glassmorphism
                         isDark = isDark
                     )
-
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
     }
 }
-
 @Composable
 fun PermissionOnboarding(
     onGrantClick: () -> Unit,
@@ -1232,7 +1254,6 @@ fun PermissionOnboarding(
         }
     }
 }
-
 @Composable
 fun FolderSelectionOnboarding(
     onSelectFolderClick: () -> Unit,
@@ -1325,7 +1346,6 @@ fun FolderSelectionOnboarding(
         }
     }
 }
-
 @Composable
 fun PlaybackTurntableDeck(
     currentTrack: Track?,
@@ -1344,7 +1364,6 @@ fun PlaybackTurntableDeck(
 ) {
     val context = LocalContext.current
     var artworkBitmap by remember { mutableStateOf<Bitmap?>(null) }
-
     LaunchedEffect(currentTrack?.uriString) {
         val trackUriStr = currentTrack?.uriString
         if (trackUriStr != null) {
@@ -1376,13 +1395,11 @@ fun PlaybackTurntableDeck(
             artworkBitmap = null
         }
     }
-
     val deckShape = when (style) {
         1 -> RoundedCornerShape(28.dp) // Material Design
         2 -> RoundedCornerShape(20.dp) // Глассморфизм
         else -> RoundedCornerShape(24.dp) // Стандартный
     }
-
     val cardModifier = if (style == 2) {
         Modifier
             .fillMaxWidth()
@@ -1390,13 +1407,11 @@ fun PlaybackTurntableDeck(
     } else {
         Modifier.fillMaxWidth()
     }
-
     val cardColor = when (style) {
         1 -> MaterialTheme.colorScheme.surfaceVariant
         2 -> if (isDark) Color.Black.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.85f)
         else -> MaterialTheme.colorScheme.surface
     }
-
     Card(
         modifier = cardModifier,
         colors = CardDefaults.cardColors(containerColor = cardColor),
@@ -1420,9 +1435,7 @@ fun PlaybackTurntableDeck(
             } else {
                 RotatingVinyl(isPlaying = isPlaying)
             }
-
             Spacer(modifier = Modifier.height(12.dp))
-
             Text(
                 text = currentTrack?.title ?: Strings.get("deck_empty", language),
                 style = MaterialTheme.typography.titleMedium,
@@ -1439,13 +1452,10 @@ fun PlaybackTurntableDeck(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-
             Spacer(modifier = Modifier.height(14.dp))
-
             val sliderPosition = if (duration > 0) currentPosition.toFloat() / duration else 0f
             var isDragging by remember { mutableStateOf(false) }
             var dragPosition by remember { mutableStateOf(0f) }
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1458,7 +1468,6 @@ fun PlaybackTurntableDeck(
                     color = if (isDark) MutedText else Color(0xFF49454F),
                     modifier = Modifier.width(36.dp)
                 )
-
                 Slider(
                     value = if (isDragging) dragPosition else sliderPosition,
                     onValueChange = {
@@ -1476,7 +1485,6 @@ fun PlaybackTurntableDeck(
                     ),
                     modifier = Modifier.weight(1f)
                 )
-
                 Text(
                     text = formatDuration(duration),
                     fontSize = 11.sp,
@@ -1485,7 +1493,6 @@ fun PlaybackTurntableDeck(
                     textAlign = androidx.compose.ui.text.style.TextAlign.End
                 )
             }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -1502,7 +1509,6 @@ fun PlaybackTurntableDeck(
                         tint = tint
                     )
                 }
-
                 IconButton(
                     onClick = onPrevClick,
                     modifier = Modifier
@@ -1516,7 +1522,6 @@ fun PlaybackTurntableDeck(
                         modifier = Modifier.size(32.dp)
                     )
                 }
-
                 Box(
                     modifier = Modifier
                         .size(60.dp)
@@ -1532,7 +1537,6 @@ fun PlaybackTurntableDeck(
                         modifier = Modifier.size(36.dp)
                     )
                 }
-
                 IconButton(
                     onClick = onNextClick,
                     modifier = Modifier
@@ -1546,7 +1550,6 @@ fun PlaybackTurntableDeck(
                         modifier = Modifier.size(32.dp)
                     )
                 }
-
                 Box(
                     modifier = Modifier
                         .background(if (isDark) DarkGreyDeck else Color.Black.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
@@ -1563,7 +1566,6 @@ fun PlaybackTurntableDeck(
         }
     }
 }
-
 @Composable
 fun BottomPlayBar(
     track: Track,
@@ -1575,21 +1577,18 @@ fun BottomPlayBar(
 ) {
     val context = LocalContext.current
     val artworkBitmap = rememberTrackArtwork(context, track.uriString)
-
     val backgroundStyleColors = when (style) {
         1 -> MaterialTheme.colorScheme.surfaceVariant
         2 -> Color.Black.copy(alpha = 0.6f) // Glassmorphism translucent
         3 -> Color.Transparent // Merged capsule style
         else -> MaterialTheme.colorScheme.surface // Standard
     }
-
     val shape = when (style) {
         1 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
         2 -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         3 -> RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
         else -> RoundedCornerShape(0.dp)
     }
-
     val barModifier = if (style == 2) {
         Modifier
             .fillMaxWidth()
@@ -1613,7 +1612,6 @@ fun BottomPlayBar(
             .background(backgroundStyleColors)
             .clickable { onBarClick() }
     }
-
     Row(
         modifier = barModifier,
         verticalAlignment = Alignment.CenterVertically
@@ -1648,9 +1646,7 @@ fun BottomPlayBar(
                 }
             }
         }
-
         Spacer(modifier = Modifier.width(12.dp))
-
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -1671,7 +1667,6 @@ fun BottomPlayBar(
                 overflow = TextOverflow.Ellipsis
             )
         }
-
         IconButton(
             onClick = onPlayPauseClick,
             modifier = Modifier.size(48.dp)
@@ -1683,7 +1678,6 @@ fun BottomPlayBar(
                 modifier = Modifier.size(32.dp)
             )
         }
-
         IconButton(
             onClick = onStopClick,
             modifier = Modifier.size(48.dp)
@@ -1695,11 +1689,9 @@ fun BottomPlayBar(
                 modifier = Modifier.size(28.dp)
             )
         }
-
         Spacer(modifier = Modifier.width(8.dp))
     }
 }
-
 @Composable
 fun TrackItemRow(
     track: Track,
@@ -1711,19 +1703,16 @@ fun TrackItemRow(
 ) {
     val context = LocalContext.current
     val artworkBitmap = rememberTrackArtwork(context, track.uriString)
-
     val itemShape = when (style) {
         1 -> RoundedCornerShape(12.dp)
         2 -> RoundedCornerShape(16.dp)
         else -> RoundedCornerShape(0.dp)
     }
-
     val itemBackgroundColor = when (style) {
         1 -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         2 -> Color.Black.copy(alpha = 0.15f)
         else -> Color.Transparent
     }
-
     val itemModifier = if (style == 2) {
         Modifier
             .fillMaxWidth()
@@ -1742,7 +1731,6 @@ fun TrackItemRow(
             .background(itemBackgroundColor)
             .testTag("track_item_card")
     }
-
     Column(
         modifier = itemModifier
     ) {
@@ -1781,7 +1769,6 @@ fun TrackItemRow(
                         )
                     }
                 }
-
                 if (isPlaying) {
                     Box(
                         modifier = Modifier
@@ -1795,9 +1782,7 @@ fun TrackItemRow(
                     }
                 }
             }
-
             Spacer(modifier = Modifier.width(14.dp))
-
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -1822,7 +1807,6 @@ fun TrackItemRow(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Normal
                     )
-
                     Text(
                         text = track.getFormattedDate(),
                         color = Color(0xFF8E8E93),
@@ -1836,7 +1820,6 @@ fun TrackItemRow(
                 Icon(Icons.Default.Upload, contentDescription = "Upload", tint = Color(0xFF00F5D4))
             }
         }
-
         HorizontalDivider(
             color = Color(0xFFEEEEEE),
             thickness = 1.dp,
@@ -1844,7 +1827,6 @@ fun TrackItemRow(
         )
     }
 }
-
 @Composable
 fun LineEqualizerGlowingSmall() {
     val infiniteTransition = rememberInfiniteTransition(label = "eq_small")
@@ -1858,7 +1840,6 @@ fun LineEqualizerGlowingSmall() {
         ),
         label = "b1"
     )
-
     val bar2Height by infiniteTransition.animateFloat(
         initialValue = 0.3f,
         targetValue = 0.9f,
@@ -1868,7 +1849,6 @@ fun LineEqualizerGlowingSmall() {
         ),
         label = "b2"
     )
-
     val bar3Height by infiniteTransition.animateFloat(
         initialValue = 0.1f,
         targetValue = 0.7f,
@@ -1878,7 +1858,6 @@ fun LineEqualizerGlowingSmall() {
         ),
         label = "b3"
     )
-
     Row(
         modifier = Modifier.size(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1904,7 +1883,6 @@ fun LineEqualizerGlowingSmall() {
         )
     }
 }
-
 @Composable
 fun LineEqualizerGlowing() {
     val infiniteTransition = rememberInfiniteTransition(label = "eq")
@@ -1918,7 +1896,6 @@ fun LineEqualizerGlowing() {
         ),
         label = "b1"
     )
-
     val bar2Height by infiniteTransition.animateFloat(
         initialValue = 0.3f,
         targetValue = 0.9f,
@@ -1928,7 +1905,6 @@ fun LineEqualizerGlowing() {
         ),
         label = "b2"
     )
-
     val bar3Height by infiniteTransition.animateFloat(
         initialValue = 0.1f,
         targetValue = 0.7f,
@@ -1938,7 +1914,6 @@ fun LineEqualizerGlowing() {
         ),
         label = "b3"
     )
-
     Row(
         modifier = Modifier.size(18.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1964,7 +1939,6 @@ fun LineEqualizerGlowing() {
         )
     }
 }
-
 @Composable
 fun rememberTrackArtwork(context: Context, uriString: String?): Bitmap? {
     if (uriString == null) return null
@@ -1987,7 +1961,6 @@ fun rememberTrackArtwork(context: Context, uriString: String?): Bitmap? {
     }
     return bitmap
 }
-
 fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000
     val min = totalSeconds / 60

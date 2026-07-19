@@ -1,3 +1,4 @@
+
 package com.example.ui
 
 object Strings {
@@ -47,7 +48,11 @@ object Strings {
             "theme_light" to "Light",
             "theme_system" to "System (Default)",
             "api_token_title" to "API Token",
-            "save" to "Save"
+            "save" to "Save",
+            "filter" to "Filter",
+            "artist" to "Artist",
+            "uploader" to "Uploader",
+            "all" to "All"
         ),
         "Russian" to mapOf(
             "tab_main" to "Главная",
@@ -90,7 +95,11 @@ object Strings {
             "theme_light" to "Светлая",
             "theme_system" to "Как в системе (По умолчанию)",
             "api_token_title" to "API Токен",
-            "save" to "Сохранить"
+            "save" to "Сохранить",
+            "filter" to "Фильтр",
+            "artist" to "Исполнитель",
+            "uploader" to "Загрузчик",
+            "all" to "Все"
         ),
         "Cute Russian" to mapOf(
             "tab_main" to "Главная ^_^",
@@ -133,7 +142,11 @@ object Strings {
             "theme_light" to "Светленькая",
             "theme_system" to "Как в системке (По умолчанному)",
             "api_token_title" to "Апи Токенчик :3",
-            "save" to "Сохранить ^_^"
+            "save" to "Сохранить ^_^",
+            "filter" to "Фильтрик",
+            "artist" to "Музыкантик",
+            "uploader" to "Загрузчик",
+            "all" to "Все :3"
         )
     )
 }
