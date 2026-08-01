@@ -55,7 +55,19 @@ object Strings {
             "reset" to "Reset",
             "apply" to "Apply",
             "artists" to "Artists",
-            "uploaders" to "Uploaders"
+            "uploaders" to "Uploaders",
+            "logs_title" to "System Logs",
+            "logs_subtitle" to "App & API request logs",
+            "logs_app" to "App Logs",
+            "logs_api" to "API Logs",
+            "logs_clear" to "Clear Logs",
+            "logs_copy" to "Copy Logs",
+            "logs_copied" to "Logs copied to clipboard!",
+            "logs_empty" to "No logs recorded yet",
+            "logs_search_placeholder" to "Search logs...",
+            "logs_menu_item" to "Application & API Logs",
+            "token_saved" to "Token saved successfully!",
+            "saved" to "Saved ✓"
         ),
         "Russian" to mapOf(
             "tab_main" to "Главная",
@@ -106,7 +118,19 @@ object Strings {
             "reset" to "Сбросить",
             "apply" to "Применить",
             "artists" to "Исполнители",
-            "uploaders" to "Загрузчики"
+            "uploaders" to "Загрузчики",
+            "logs_title" to "Логи системы",
+            "logs_subtitle" to "Логи работы приложения и API-запросов",
+            "logs_app" to "Логи приложения",
+            "logs_api" to "Логи API",
+            "logs_clear" to "Очистить логи",
+            "logs_copy" to "Скопировать",
+            "logs_copied" to "Логи скопированы в буфер!",
+            "logs_empty" to "Логи отсутствуют",
+            "logs_search_placeholder" to "Поиск по логам...",
+            "logs_menu_item" to "Логи приложения и API",
+            "token_saved" to "Токен успешно сохранён!",
+            "saved" to "Сохранено ✓"
         ),
         "Cute Russian" to mapOf(
             "tab_main" to "Главная ^_^",
@@ -157,7 +181,19 @@ object Strings {
             "reset" to "Сбросить ^_^",
             "apply" to "Применить <3",
             "artists" to "Музыкантики",
-            "uploaders" to "Загрузчики :3"
+            "uploaders" to "Загрузчики :3",
+            "logs_title" to "Логичики системы :3",
+            "logs_subtitle" to "Логики приложения и API-запросиков",
+            "logs_app" to "Логи приложения",
+            "logs_api" to "Логи API-чки",
+            "logs_clear" to "Очистить логички",
+            "logs_copy" to "Скопировать",
+            "logs_copied" to "Логички скопированы! ^_^",
+            "logs_empty" to "Логичков пока нет (T_T)",
+            "logs_search_placeholder" to "Поиск по логикам...",
+            "logs_menu_item" to "Логи приложения и API",
+            "token_saved" to "Токенчик сохранён! ^_^",
+            "saved" to "Сохранено! <3"
         )
     )
 }

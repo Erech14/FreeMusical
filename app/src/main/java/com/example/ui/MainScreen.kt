@@ -519,7 +519,7 @@ fun MainScreen(
                                             ) {
                                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                     Image(
-                                                        painter = painterResource(id = R.drawable.img_app_logo),
+                                                        painter = painterResource(id = R.drawable.ic_app_logo),
                                                         contentDescription = "App Logo",
                                                         modifier = Modifier
                                                             .size(110.dp)
@@ -550,7 +550,7 @@ fun MainScreen(
                                                     modifier = Modifier.padding(24.dp)
                                                 ) {
                                                     Image(
-                                                        painter = painterResource(id = R.drawable.img_app_logo),
+                                                        painter = painterResource(id = R.drawable.ic_app_logo),
                                                         contentDescription = "App Logo",
                                                         modifier = Modifier
                                                             .size(100.dp)
@@ -724,285 +724,345 @@ fun MainScreen(
                                 }
                                 2 -> {
                                     // ТАБ 2: НАСТРОЙКИ (Settings screen)
-                                    val currentThemeVal by viewModel.appTheme.collectAsStateWithLifecycle()
-                                    var themeExpanded by remember { mutableStateOf(false) }
-                                    val themeOptions = listOf(0, 1, 2)
-                                    val currentThemeLabel = when (currentThemeVal) {
-                                        0 -> Strings.get("theme_dark", language)
-                                        1 -> Strings.get("theme_light", language)
-                                        else -> Strings.get("theme_system", language)
-                                    }
-                                    var langExpanded by remember { mutableStateOf(false) }
-                                    val languages = listOf("Russian", "Cute Russian", "English")
-                                    val apiToken by viewModel.apiToken.collectAsStateWithLifecycle()
-                                    var tokenInput by remember(apiToken) { mutableStateOf(apiToken) }
-                                    
-                                    val logs by com.example.ui.Logger.logs.collectAsStateWithLifecycle()
-                                    var logMenuExpanded by remember { mutableStateOf(false) }
-                                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-                                    val context = androidx.compose.ui.platform.LocalContext.current
-                                    LazyColumn(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                                        contentPadding = PaddingValues(bottom = 160.dp)
-                                    ) {
-                                        item {
-                                            Text(
-                                                text = Strings.get("appearance", language),
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 20.sp,
-                                                color = contentColor,
-                                                modifier = Modifier.padding(bottom = 12.dp)
-                                            )
-                                            ExposedDropdownMenuBox(
-                                                expanded = themeExpanded,
-                                                onExpandedChange = { themeExpanded = it },
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                            ) {
-                                                TextField(
-                                                    value = currentThemeLabel,
-                                                    onValueChange = {},
-                                                    readOnly = true,
-                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
-                                                    colors = TextFieldDefaults.colors(
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                        unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                        focusedIndicatorColor = Color.Transparent,
-                                                        unfocusedIndicatorColor = Color.Transparent
-                                                    ),
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                                        .menuAnchor()
-                                                )
-                                                ExposedDropdownMenu(
-                                                    expanded = themeExpanded,
-                                                    onDismissRequest = { themeExpanded = false },
-                                                    modifier = Modifier.background(Color(0xFF1E1F24))
-                                                ) {
-                                                    themeOptions.forEach { themeId ->
-                                                        val optionLabel = when (themeId) {
-                                                            0 -> Strings.get("theme_dark", language)
-                                                            1 -> Strings.get("theme_light", language)
-                                                            else -> Strings.get("theme_system", language)
-                                                        }
-                                                        DropdownMenuItem(
-                                                            text = { Text(optionLabel, color = Color.White, fontWeight = FontWeight.Bold) },
-                                                            onClick = {
-                                                                viewModel.setAppTheme(themeId)
-                                                                themeExpanded = false
-                                                            }
-                                                        )
-                                                    }
-                                                }
+                                    var showLogsSubmenu by remember { mutableStateOf(false) }
+
+                                    if (showLogsSubmenu) {
+                                        LogsSubmenuScreen(
+                                            language = language,
+                                            onBack = { showLogsSubmenu = false }
+                                        )
+                                    } else {
+                                        val currentThemeVal by viewModel.appTheme.collectAsStateWithLifecycle()
+                                        var themeExpanded by remember { mutableStateOf(false) }
+                                        val themeOptions = listOf(0, 1, 2)
+                                        val currentThemeLabel = when (currentThemeVal) {
+                                            0 -> Strings.get("theme_dark", language)
+                                            1 -> Strings.get("theme_light", language)
+                                            else -> Strings.get("theme_system", language)
+                                        }
+                                        var langExpanded by remember { mutableStateOf(false) }
+                                        val languages = listOf("Russian", "Cute Russian", "English")
+                                        val apiToken by viewModel.apiToken.collectAsStateWithLifecycle()
+                                        var tokenInput by remember(apiToken) { mutableStateOf(apiToken) }
+                                        var tokenSavedSuccess by remember { mutableStateOf(false) }
+                                        val settingsContext = LocalContext.current
+
+                                        LaunchedEffect(tokenSavedSuccess) {
+                                            if (tokenSavedSuccess) {
+                                                delay(2500)
+                                                tokenSavedSuccess = false
                                             }
-                                            Spacer(modifier = Modifier.height(16.dp))
-                                            // LANGUAGE SELECTOR
-                                            Text(
-                                                text = Strings.get("language", language),
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 18.sp,
-                                                color = contentColor,
-                                                modifier = Modifier.padding(bottom = 8.dp)
-                                            )
-                                            ExposedDropdownMenuBox(
-                                                expanded = langExpanded,
-                                                onExpandedChange = { langExpanded = it },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                TextField(
-                                                    value = language.takeIf { languages.contains(it) } ?: "Russian",
-                                                    onValueChange = {},
-                                                    readOnly = true,
-                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
-                                                    colors = TextFieldDefaults.colors(
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                        unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                        focusedIndicatorColor = Color.Transparent,
-                                                        unfocusedIndicatorColor = Color.Transparent
-                                                    ),
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                                        .menuAnchor()
-                                                )
-                                                ExposedDropdownMenu(
-                                                    expanded = langExpanded,
-                                                    onDismissRequest = { langExpanded = false },
-                                                    modifier = Modifier.background(Color(0xFF1E1F24))
-                                                ) {
-                                                    languages.forEach { selectionOption ->
-                                                        DropdownMenuItem(
-                                                            text = { Text(selectionOption, color = Color.White, fontWeight = FontWeight.Bold) },
-                                                            onClick = {
-                                                                viewModel.setAppLanguage(selectionOption)
-                                                                langExpanded = false
-                                                            }
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.height(24.dp))
-                                            // API TOKEN CONFIGURATION
-                                            Text(
-                                                text = Strings.get("api_token_title", language),
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 18.sp,
-                                                color = contentColor,
-                                                modifier = Modifier.padding(bottom = 8.dp)
-                                            )
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                TextField(
-                                                    value = tokenInput,
-                                                    onValueChange = { tokenInput = it },
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                                                    colors = TextFieldDefaults.colors(
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                        unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
-                                                        focusedIndicatorColor = Color.Transparent,
-                                                        unfocusedIndicatorColor = Color.Transparent
-                                                    ),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    singleLine = true
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Button(
-                                                    onClick = { viewModel.setApiToken(tokenInput) },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270))
-                                                ) {
-                                                    Text(Strings.get("save", language), fontWeight = FontWeight.Bold)
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.height(24.dp))
-                                            Text(
-                                                text = "Управление плейлистами (Настройки)",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 18.sp,
-                                                color = contentColor,
-                                                modifier = Modifier.padding(bottom = 8.dp)
-                                            )
                                         }
                                         
-                                        items(playlists) { playlist ->
-                                            val isMain = playlist.name == "Главный" || playlist.name == "Main" || playlist.name == "Главный :3"
-                                            Card(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 4.dp)
-                                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                                                shape = RoundedCornerShape(12.dp),
-                                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
-                                            ) {
+                                        LazyColumn(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                                            contentPadding = PaddingValues(bottom = 160.dp)
+                                        ) {
+                                            item {
+                                                Text(
+                                                    text = Strings.get("appearance", language),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 20.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 12.dp)
+                                                )
+                                                ExposedDropdownMenuBox(
+                                                    expanded = themeExpanded,
+                                                    onExpandedChange = { themeExpanded = it },
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                                ) {
+                                                    TextField(
+                                                        value = currentThemeLabel,
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                                                        colors = TextFieldDefaults.colors(
+                                                            focusedTextColor = Color.White,
+                                                            unfocusedTextColor = Color.White,
+                                                            focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                            unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                            focusedIndicatorColor = Color.Transparent,
+                                                            unfocusedIndicatorColor = Color.Transparent
+                                                        ),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                                            .menuAnchor()
+                                                    )
+                                                    ExposedDropdownMenu(
+                                                        expanded = themeExpanded,
+                                                        onDismissRequest = { themeExpanded = false },
+                                                        modifier = Modifier.background(Color(0xFF1E1F24))
+                                                    ) {
+                                                        themeOptions.forEach { themeId ->
+                                                            val optionLabel = when (themeId) {
+                                                                0 -> Strings.get("theme_dark", language)
+                                                                1 -> Strings.get("theme_light", language)
+                                                                else -> Strings.get("theme_system", language)
+                                                            }
+                                                            DropdownMenuItem(
+                                                                text = { Text(optionLabel, color = Color.White, fontWeight = FontWeight.Bold) },
+                                                                onClick = {
+                                                                    viewModel.setAppTheme(themeId)
+                                                                    themeExpanded = false
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                // LANGUAGE SELECTOR
+                                                Text(
+                                                    text = Strings.get("language", language),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                )
+                                                ExposedDropdownMenuBox(
+                                                    expanded = langExpanded,
+                                                    onExpandedChange = { langExpanded = it },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    TextField(
+                                                        value = language.takeIf { languages.contains(it) } ?: "Russian",
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
+                                                        colors = TextFieldDefaults.colors(
+                                                            focusedTextColor = Color.White,
+                                                            unfocusedTextColor = Color.White,
+                                                            focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                            unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                            focusedIndicatorColor = Color.Transparent,
+                                                            unfocusedIndicatorColor = Color.Transparent
+                                                        ),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                                            .menuAnchor()
+                                                    )
+                                                    ExposedDropdownMenu(
+                                                        expanded = langExpanded,
+                                                        onDismissRequest = { langExpanded = false },
+                                                        modifier = Modifier.background(Color(0xFF1E1F24))
+                                                    ) {
+                                                        languages.forEach { selectionOption ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(selectionOption, color = Color.White, fontWeight = FontWeight.Bold) },
+                                                                onClick = {
+                                                                    viewModel.setAppLanguage(selectionOption)
+                                                                    langExpanded = false
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(24.dp))
+                                                // API TOKEN CONFIGURATION
+                                                Text(
+                                                    text = Strings.get("api_token_title", language),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                )
                                                 Row(
-                                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                    modifier = Modifier.fillMaxWidth(),
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Text(playlist.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                            if (isMain) {
-                                                                Spacer(modifier = Modifier.width(6.dp))
-                                                                Text("★ Главный", color = Color(0xFF00F5D4), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                    TextField(
+                                                        value = tokenInput,
+                                                        onValueChange = { tokenInput = it },
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                                        colors = TextFieldDefaults.colors(
+                                                            focusedTextColor = Color.White,
+                                                            unfocusedTextColor = Color.White,
+                                                            focusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                            unfocusedContainerColor = Color.Black.copy(alpha = 0.35f),
+                                                            focusedIndicatorColor = Color.Transparent,
+                                                            unfocusedIndicatorColor = Color.Transparent
+                                                        ),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        singleLine = true
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Button(
+                                                        onClick = {
+                                                            viewModel.setApiToken(tokenInput)
+                                                            tokenSavedSuccess = true
+                                                            Toast.makeText(
+                                                                settingsContext,
+                                                                Strings.get("token_saved", language),
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(
+                                                            containerColor = if (tokenSavedSuccess) Color(0xFF30D158) else Color(0xFF118270)
+                                                        ),
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    ) {
+                                                        AnimatedContent(
+                                                            targetState = tokenSavedSuccess,
+                                                            label = "token_save_anim"
+                                                        ) { saved ->
+                                                            if (saved) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.Check,
+                                                                        contentDescription = null,
+                                                                        tint = Color.White,
+                                                                        modifier = Modifier.size(18.dp)
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Text(Strings.get("saved", language), fontWeight = FontWeight.Bold)
+                                                                }
+                                                            } else {
+                                                                Text(Strings.get("save", language), fontWeight = FontWeight.Bold)
                                                             }
                                                         }
-                                                        Text(playlist.uri, color = Color.LightGray, fontSize = 10.sp, maxLines = 1)
                                                     }
-                                                    
-                                                    IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
+                                                }
+                                                AnimatedVisibility(
+                                                    visible = tokenSavedSuccess,
+                                                    enter = fadeIn() + expandVertically(),
+                                                    exit = fadeOut() + shrinkVertically()
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(top = 8.dp)
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(Color(0xFF30D158).copy(alpha = 0.15f))
+                                                            .border(1.dp, Color(0xFF30D158).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
                                                         Icon(
-                                                            imageVector = Icons.Default.Delete,
-                                                            contentDescription = Strings.get("delete", language),
-                                                            tint = Color(0xFFFF453A),
+                                                            imageVector = Icons.Default.CheckCircle,
+                                                            contentDescription = null,
+                                                            tint = Color(0xFF30D158),
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            text = Strings.get("token_saved", language),
+                                                            color = Color(0xFF30D158),
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Medium
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(24.dp))
+                                                
+                                                // LOGS SUBMENU LINK CARD
+                                                Text(
+                                                    text = Strings.get("logs_title", language),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                )
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .border(1.dp, Color(0xFF00F5D4).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                                        .clickable { showLogsSubmenu = true },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(14.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(40.dp)
+                                                                .clip(CircleShape)
+                                                                .background(Color(0xFF00F5D4).copy(alpha = 0.15f)),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.ReceiptLong,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF00F5D4),
+                                                                modifier = Modifier.size(22.dp)
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.width(14.dp))
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = Strings.get("logs_menu_item", language),
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 15.sp,
+                                                                color = Color.White
+                                                            )
+                                                            Spacer(modifier = Modifier.height(2.dp))
+                                                            Text(
+                                                                text = Strings.get("logs_subtitle", language),
+                                                                fontSize = 11.sp,
+                                                                color = Color.Gray
+                                                            )
+                                                        }
+                                                        Icon(
+                                                            imageVector = Icons.Default.KeyboardArrowRight,
+                                                            contentDescription = null,
+                                                            tint = Color.Gray,
                                                             modifier = Modifier.size(20.dp)
                                                         )
                                                     }
                                                 }
+
+                                                Spacer(modifier = Modifier.height(24.dp))
+                                                Text(
+                                                    text = "Управление плейлистами (Настройки)",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                )
                                             }
-                                        }
-                                        item {
-                                            Spacer(modifier = Modifier.height(32.dp))
-                                            Text(
-                                                text = "Application Logs",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 18.sp,
-                                                color = contentColor,
-                                                modifier = Modifier.padding(bottom = 8.dp)
-                                            )
                                             
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text("${logs.size} log entries", color = Color.Gray, fontSize = 12.sp)
-                                                Box {
-                                                    IconButton(onClick = { logMenuExpanded = true }) {
-                                                        Icon(Icons.Default.MoreVert, contentDescription = "Log Actions", tint = Color.White)
-                                                    }
-                                                    DropdownMenu(
-                                                        expanded = logMenuExpanded,
-                                                        onDismissRequest = { logMenuExpanded = false },
-                                                        modifier = Modifier.background(Color(0xFF1E1F24))
-                                                    ) {
-                                                        DropdownMenuItem(
-                                                            text = { Text("Copy to clipboard", color = Color.White) },
-                                                            onClick = { 
-                                                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(logs.joinToString("\n")))
-                                                                android.widget.Toast.makeText(context, "Logs copied!", android.widget.Toast.LENGTH_SHORT).show()
-                                                                logMenuExpanded = false
-                                                            }
-                                                        )
-                                                        DropdownMenuItem(
-                                                            text = { Text("Download logs", color = Color.White) },
-                                                            onClick = {
-                                                                try {
-                                                                    val file = java.io.File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "logs.txt")
-                                                                    file.writeText(logs.joinToString("\n"))
-                                                                    android.widget.Toast.makeText(context, "Saved to Downloads/logs.txt", android.widget.Toast.LENGTH_LONG).show()
-                                                                } catch (e: Exception) {
-                                                                    android.widget.Toast.makeText(context, "Failed to save", android.widget.Toast.LENGTH_SHORT).show()
-                                                                }
-                                                                logMenuExpanded = false
-                                                            }
-                                                        )
-                                                        DropdownMenuItem(
-                                                            text = { Text("Clear Logs", color = Color(0xFFFF453A)) },
-                                                            onClick = {
-                                                                com.example.ui.Logger.clear()
-                                                                logMenuExpanded = false
-                                                            }
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            if (logs.isNotEmpty()) {
-                                                Column(
+                                            items(playlists) { playlist ->
+                                                val isMain = playlist.name == "Главный" || playlist.name == "Main" || playlist.name == "Главный :3"
+                                                Card(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                                        .padding(12.dp)
+                                                        .padding(vertical = 4.dp)
+                                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
                                                 ) {
-                                                    logs.takeLast(100).forEach { logMsg ->
-                                                        Text(
-                                                            text = logMsg,
-                                                            color = Color.Green,
-                                                            fontFamily = FontFamily.Monospace,
-                                                            fontSize = 10.sp,
-                                                            modifier = Modifier.padding(vertical = 4.dp)
-                                                        )
-                                                        Divider(color = Color.DarkGray, thickness = 0.5.dp)
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text(playlist.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                                if (isMain) {
+                                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                                    Text("★ Главный", color = Color(0xFF00F5D4), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                            Text(playlist.uri, color = Color.LightGray, fontSize = 10.sp, maxLines = 1)
+                                                        }
+                                                        
+                                                        IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Delete,
+                                                                contentDescription = Strings.get("delete", language),
+                                                                tint = Color(0xFFFF453A),
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1647,7 +1707,7 @@ fun BottomPlayBar(
                 )
             } else {
                 Image(
-                    painter = painterResource(id = R.drawable.img_app_logo),
+                    painter = painterResource(id = R.drawable.ic_app_logo),
                     contentDescription = "Cover Art",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -1764,7 +1824,7 @@ fun TrackItemRow(
                     )
                 } else {
                     Image(
-                        painter = painterResource(id = R.drawable.img_app_logo),
+                        painter = painterResource(id = R.drawable.ic_app_logo),
                         contentDescription = "Cover Art",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop

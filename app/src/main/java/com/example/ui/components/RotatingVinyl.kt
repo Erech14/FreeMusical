@@ -92,7 +92,7 @@ fun RotatingVinyl(
 
         // Center Album Logo Artwork
         Image(
-            painter = painterResource(id = R.drawable.img_app_logo),
+            painter = painterResource(id = R.drawable.ic_app_logo),
             contentDescription = "Vinyl Logo Artwork",
             modifier = Modifier
                 .size(80.dp)
