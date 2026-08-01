@@ -152,10 +152,12 @@ fun LogsSubmenuScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .height(48.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp)
                 .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
                 .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             val isAppSelected = selectedCategory == LogCategory.APP
             val isApiSelected = selectedCategory == LogCategory.API
@@ -164,25 +166,31 @@ fun LogsSubmenuScreen(
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isAppSelected) Color(0xFF118270) else Color.Transparent)
-                    .clickable { selectedCategory = LogCategory.APP }
-                    .padding(vertical = 10.dp),
+                    .clickable { selectedCategory = LogCategory.APP },
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Apps,
                         contentDescription = null,
                         tint = if (isAppSelected) Color.White else Color.Gray,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "${Strings.get("logs_app", language)} (${appLogs.size})",
                         color = if (isAppSelected) Color.White else Color.Gray,
                         fontWeight = if (isAppSelected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 13.sp
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -193,25 +201,31 @@ fun LogsSubmenuScreen(
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isApiSelected) Color(0xFF5A0B9C) else Color.Transparent)
-                    .clickable { selectedCategory = LogCategory.API }
-                    .padding(vertical = 10.dp),
+                    .clickable { selectedCategory = LogCategory.API },
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Api,
                         contentDescription = null,
                         tint = if (isApiSelected) Color.White else Color.Gray,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "${Strings.get("logs_api", language)} (${apiLogs.size})",
                         color = if (isApiSelected) Color.White else Color.Gray,
                         fontWeight = if (isApiSelected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 13.sp
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

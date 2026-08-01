@@ -1770,7 +1770,6 @@ fun TrackItemRow(
     style: Int
 ) {
     val context = LocalContext.current
-    val artworkBitmap = rememberTrackArtwork(context, track.uriString)
     val itemShape = when (style) {
         1 -> RoundedCornerShape(12.dp)
         2 -> RoundedCornerShape(16.dp)
@@ -1815,21 +1814,12 @@ fun TrackItemRow(
                     .background(Color(0xFFE5E5EA)),
                 contentAlignment = Alignment.Center
             ) {
-                if (artworkBitmap != null) {
-                    Image(
-                        bitmap = artworkBitmap.asImageBitmap(),
-                        contentDescription = "Cover Art",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_app_logo),
-                        contentDescription = "Cover Art",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.ic_app_logo),
+                    contentDescription = "Cover Art",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
                 if (isPlaying) {
                     Box(
                         modifier = Modifier

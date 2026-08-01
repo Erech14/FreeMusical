@@ -42,6 +42,10 @@ object Logger {
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs = _logs.asStateFlow()
 
+    init {
+        logApp("Logging system initialized", tag = "System")
+    }
+
     fun logApp(message: String, level: LogLevel = LogLevel.INFO, tag: String = "App") {
         val entry = createEntry(LogCategory.APP, level, tag, message)
         _appLogs.value = (_appLogs.value + entry).takeLast(500)

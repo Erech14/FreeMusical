@@ -83,6 +83,7 @@ class MusicViewModel(
     fun setApiToken(token: String) {
         prefs.edit().putString("api_token", token).apply()
         _apiToken.value = token
+        com.example.ui.Logger.logApp("API token saved (length: ${token.length})", tag = "Settings")
     }
 
     // API logic
@@ -222,6 +223,7 @@ class MusicViewModel(
     fun setAppTheme(theme: Int) {
         prefs.edit().putInt("app_theme", theme).apply()
         _appTheme.value = theme
+        com.example.ui.Logger.logApp("App theme updated: mode $theme", tag = "Settings")
     }
 
     fun setAppStyle(style: Int) {
@@ -232,6 +234,7 @@ class MusicViewModel(
     fun setAppLanguage(lang: String) {
         prefs.edit().putString("app_language", lang).apply()
         _appLanguage.value = lang
+        com.example.ui.Logger.logApp("Language changed to: $lang", tag = "Settings")
     }
 
     // Playback control from header
@@ -286,6 +289,7 @@ class MusicViewModel(
         val id = java.util.UUID.randomUUID().toString()
         newList.add(SimplePlaylist(id, name, uri.toString()))
         savePlaylists(newList)
+        com.example.ui.Logger.logApp("Created playlist '$name' ($uri)", tag = "Playlist")
     }
 
     fun deletePlaylist(id: String) {
@@ -294,6 +298,7 @@ class MusicViewModel(
         if (_defaultPlaylistId.value == id) {
             setDefaultPlaylist(null)
         }
+        com.example.ui.Logger.logApp("Deleted playlist ID: $id", tag = "Playlist")
     }
 
     fun setDefaultPlaylist(id: String?) {
@@ -303,6 +308,7 @@ class MusicViewModel(
 
     init {
         loadPlaylists()
+        com.example.ui.Logger.logApp("ViewModel initialized. Loaded ${_playlists.value.size} playlists.", tag = "App")
         
         val defaultId = _defaultPlaylistId.value
         val defaultPlaylist = _playlists.value.find { it.id == defaultId }
@@ -318,6 +324,7 @@ class MusicViewModel(
             val uri = Uri.parse(startupUriStr)
             if (hasPersistedPermission(uri)) {
                 _selectedFolderUri.value = startupUriStr
+                com.example.ui.Logger.logApp("Restored folder URI from settings: $startupUriStr", tag = "Storage")
                 scanDirectory(uri)
             }
         }
@@ -380,6 +387,7 @@ class MusicViewModel(
     }
 
     fun scanDirectory(uri: Uri) {
+        com.example.ui.Logger.logApp("Scanning music directory: $uri", tag = "Scanner")
         viewModelScope.launch {
             _isScanning.value = true
             _scanCount.value = 0
@@ -396,6 +404,7 @@ class MusicViewModel(
             } else {
                 _scanCount.value = tracksState.value.size
             }
+            com.example.ui.Logger.logApp("Directory scan completed: discovered ${_scanCount.value} audio tracks", tag = "Scanner")
             
             createMainPlaylistIfNeeded(uri)
             _isScanning.value = false
@@ -416,6 +425,7 @@ class MusicViewModel(
         }
         
         MusicPlayerEngine.release()
+        com.example.ui.Logger.logApp("Folder selection reset. Library cleared.", tag = "Storage")
         
         prefs.edit().remove("selected_folder_uri").apply()
         _selectedFolderUri.value = null
@@ -426,23 +436,28 @@ class MusicViewModel(
     }
 
     fun playTrack(track: Track) {
+        com.example.ui.Logger.logApp("Selected track: '${track.title}' by ${track.artist}", tag = "Player")
         MusicPlayerEngine.playTrack(context, track)
     }
 
     fun togglePlayPause() {
+        com.example.ui.Logger.logApp("Toggled play/pause button", tag = "Player")
         MusicPlayerEngine.togglePlayPause(context)
     }
 
     fun playNext() {
+        com.example.ui.Logger.logApp("Triggered skip to next track", tag = "Player")
         MusicPlayerEngine.playNext(context)
     }
 
     fun playPrevious() {
+        com.example.ui.Logger.logApp("Triggered skip to previous track", tag = "Player")
         MusicPlayerEngine.playPrevious(context)
     }
 
     fun toggleShuffle() {
         MusicPlayerEngine.toggleShuffle()
+        com.example.ui.Logger.logApp("Shuffle mode: ${if (isShuffleEnabled.value) "ENABLED" else "DISABLED"}", tag = "Player")
     }
     
     fun stopPlayback() {
