@@ -1,8 +1,8 @@
-
 package com.example.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,12 +11,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.R
 
 @Composable
 fun RotatingVinyl(
@@ -47,7 +51,7 @@ fun RotatingVinyl(
             .padding(4.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Draw Authentic Vinyl Record with concentric tracks and reflective shine overlays
+        // Draw Authentic Vinyl Record with concentric tracks
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -84,28 +88,18 @@ fun RotatingVinyl(
                 center = center,
                 style = Stroke(width = 1f)
             )
-
-            // 4. Colorful central paper release sticker
-            drawCircle(
-                color = Color(0xFFFFA000), // PrimaryAmber
-                radius = radius * 0.35f,
-                center = center
-            )
-
-            // 5. Secondary inner ring for vintage label styling
-            drawCircle(
-                color = Color(0xFFFF5722), // AccentOrange
-                radius = radius * 0.25f,
-                center = center
-            )
-
-            // 6. Album spindle hub
-            drawCircle(
-                color = Color(0xFF0F0F13), // CharcoalBlack
-                radius = radius * 0.04f,
-                center = center
-            )
         }
+
+        // Center Album Logo Artwork
+        Image(
+            painter = painterResource(id = R.drawable.img_app_logo),
+            contentDescription = "Vinyl Logo Artwork",
+            modifier = Modifier
+                .size(80.dp)
+                .rotate(rotationAngle)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
 
         // Draw Ambient Vinyl Highlights (does not rotate, simulates static studio reflections)
         Canvas(modifier = Modifier.fillMaxSize()) {

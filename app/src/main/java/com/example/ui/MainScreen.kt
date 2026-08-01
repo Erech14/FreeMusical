@@ -70,6 +70,8 @@ import android.content.Context
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.example.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -516,6 +518,16 @@ fun MainScreen(
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Image(
+                                                        painter = painterResource(id = R.drawable.img_app_logo),
+                                                        contentDescription = "App Logo",
+                                                        modifier = Modifier
+                                                            .size(110.dp)
+                                                            .clip(CircleShape)
+                                                            .shadow(16.dp, CircleShape),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                    Spacer(modifier = Modifier.height(20.dp))
                                                     CircularProgressIndicator(color = Color(0xFF00F5D4))
                                                     Spacer(modifier = Modifier.height(12.dp))
                                                     Text(
@@ -537,13 +549,16 @@ fun MainScreen(
                                                     horizontalAlignment = Alignment.CenterHorizontally,
                                                     modifier = Modifier.padding(24.dp)
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.MusicOff,
-                                                        contentDescription = null,
-                                                        tint = Color.LightGray,
-                                                        modifier = Modifier.size(64.dp)
+                                                    Image(
+                                                        painter = painterResource(id = R.drawable.img_app_logo),
+                                                        contentDescription = "App Logo",
+                                                        modifier = Modifier
+                                                            .size(100.dp)
+                                                            .clip(CircleShape)
+                                                            .shadow(12.dp, CircleShape),
+                                                        contentScale = ContentScale.Crop
                                                     )
-                                                    Spacer(modifier = Modifier.height(12.dp))
+                                                    Spacer(modifier = Modifier.height(16.dp))
                                                     Text(
                                                         text = Strings.get("library_empty", language),
                                                         fontWeight = FontWeight.Bold,
@@ -1631,19 +1646,12 @@ fun BottomPlayBar(
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
             } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF499587)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.img_app_logo),
+                    contentDescription = "Cover Art",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -1755,19 +1763,12 @@ fun TrackItemRow(
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF499587)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.img_app_logo),
+                        contentDescription = "Cover Art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
                 }
                 if (isPlaying) {
                     Box(
