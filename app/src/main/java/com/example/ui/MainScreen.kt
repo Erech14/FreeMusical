@@ -3,6 +3,8 @@ package com.example.ui
 
 import android.net.Uri
 import android.os.Build
+import android.util.LruCache
+import kotlinx.coroutines.delay
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1770,6 +1772,7 @@ fun TrackItemRow(
     style: Int
 ) {
     val context = LocalContext.current
+    val artworkBitmap = rememberTrackArtwork(context, track.uriString)
     val itemShape = when (style) {
         1 -> RoundedCornerShape(12.dp)
         2 -> RoundedCornerShape(16.dp)
@@ -1814,12 +1817,21 @@ fun TrackItemRow(
                     .background(Color(0xFFE5E5EA)),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_app_logo),
-                    contentDescription = "Cover Art",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                if (artworkBitmap != null) {
+                    Image(
+                        bitmap = artworkBitmap.asImageBitmap(),
+                        contentDescription = "Cover Art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_app_logo),
+                        contentDescription = "Cover Art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
                 if (isPlaying) {
                     Box(
                         modifier = Modifier
@@ -1990,23 +2002,43 @@ fun LineEqualizerGlowing() {
         )
     }
 }
+object ArtworkCache {
+    private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+    private val cacheSize = maxMemory / 8
+    val cache = object : LruCache<String, Bitmap>(cacheSize) {
+        override fun sizeOf(key: String, bitmap: Bitmap): Int {
+            return bitmap.byteCount / 1024
+        }
+    }
+}
+
 @Composable
 fun rememberTrackArtwork(context: Context, uriString: String?): Bitmap? {
     if (uriString == null) return null
-    var bitmap by remember(uriString) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(uriString) {
-        withContext(Dispatchers.IO) {
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(context, Uri.parse(uriString))
-                val artBytes = retriever.embeddedPicture
-                if (artBytes != null) {
-                    bitmap = BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
+    var bitmap by remember(uriString) { mutableStateOf<Bitmap?>(ArtworkCache.cache.get(uriString)) }
+    
+    if (bitmap == null) {
+        LaunchedEffect(uriString) {
+            delay(150) // Delay to avoid loading during fast scrolling
+            if (ArtworkCache.cache.get(uriString) != null) {
+                bitmap = ArtworkCache.cache.get(uriString)
+                return@LaunchedEffect
+            }
+            withContext(Dispatchers.IO) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, Uri.parse(uriString))
+                    val artBytes = retriever.embeddedPicture
+                    if (artBytes != null) {
+                        val decoded = BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
+                        ArtworkCache.cache.put(uriString, decoded)
+                        bitmap = decoded
+                    }
+                } catch (e: Exception) {
+                    // Ignore failure
+                } finally {
+                    retriever.release()
                 }
-            } catch (e: Exception) {
-                // Ignore failure
-            } finally {
-                retriever.release()
             }
         }
     }
