@@ -1,4 +1,3 @@
-
 package com.example.ui
 
 object Strings {
@@ -52,7 +51,11 @@ object Strings {
             "filter" to "Filter",
             "artist" to "Artist",
             "uploader" to "Uploader",
-            "all" to "All"
+            "all" to "All",
+            "reset" to "Reset",
+            "apply" to "Apply",
+            "artists" to "Artists",
+            "uploaders" to "Uploaders"
         ),
         "Russian" to mapOf(
             "tab_main" to "Главная",
@@ -99,7 +102,11 @@ object Strings {
             "filter" to "Фильтр",
             "artist" to "Исполнитель",
             "uploader" to "Загрузчик",
-            "all" to "Все"
+            "all" to "Все",
+            "reset" to "Сбросить",
+            "apply" to "Применить",
+            "artists" to "Исполнители",
+            "uploaders" to "Загрузчики"
         ),
         "Cute Russian" to mapOf(
             "tab_main" to "Главная ^_^",
@@ -146,7 +153,11 @@ object Strings {
             "filter" to "Фильтрик",
             "artist" to "Музыкантик",
             "uploader" to "Загрузчик",
-            "all" to "Все :3"
+            "all" to "Все :3",
+            "reset" to "Сбросить ^_^",
+            "apply" to "Применить <3",
+            "artists" to "Музыкантики",
+            "uploaders" to "Загрузчики :3"
         )
     )
 }
