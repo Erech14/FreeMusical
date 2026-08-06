@@ -1,7 +1,13 @@
 
 package com.example
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,6 +36,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        requestBatteryOptimization()
+
         setContent {
             val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
             MyApplicationTheme(appTheme = appTheme) {
@@ -37,6 +46,19 @@ class MainActivity : ComponentActivity() {
                     viewModel = viewModel,
                     modifier = Modifier.fillMaxSize()
                 )
+            }
+        }
+    }
+
+    private fun requestBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent()
+            val packageName = packageName
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                intent.action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
             }
         }
     }
