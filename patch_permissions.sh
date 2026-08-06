@@ -1,0 +1,3 @@
+sed -i 's/val permissionString = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {/val permissionStrings = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { arrayOf(android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.POST_NOTIFICATIONS) } else { arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE) }/g' app/src/main/java/com/example/ui/MainScreen.kt
+sed -i '/android.Manifest.permission.READ_MEDIA_AUDIO/d' app/src/main/java/com/example/ui/MainScreen.kt
+sed -i '/android.Manifest.permission.READ_EXTERNAL_STORAGE/d' app/src/main/java/com/example/ui/MainScreen.kt

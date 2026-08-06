@@ -139,14 +139,16 @@ fun MainScreen(
         }
     }
     // Storage permission launcher depending on SDK
-    val permissionString = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        android.Manifest.permission.READ_MEDIA_AUDIO
+    val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.POST_NOTIFICATIONS)
     } else {
-        android.Manifest.permission.READ_EXTERNAL_STORAGE
+        arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
     }
+    
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val isGranted = permissions.entries.all { it.value }
         viewModel.setPermissionGranted(isGranted)
         if (isGranted && selectedFolderUri == null) {
             try {
@@ -156,15 +158,33 @@ fun MainScreen(
             }
         }
     }
+
     // Check permission on startup
     LaunchedEffect(Unit) {
         val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            context.checkSelfPermission(permissionString) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            permissionsToRequest.all { 
+                context.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED 
+            }
         } else {
             true
         }
         viewModel.setPermissionGranted(hasPermission)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(context.packageName)) {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
+
     // Identify if current folder is the "Главный" / "Main" playlist
     val isCurrentMainPlaylist = remember(playlists, selectedFolderUri) {
         playlists.any { (it.name == "Главный" || it.name == "Main" || it.name == "Главный :3") && it.uri == selectedFolderUri }
@@ -354,7 +374,7 @@ fun MainScreen(
                 when {
                     !isPermissionGranted -> {
                         PermissionOnboarding(
-                            onGrantClick = { permissionLauncher.launch(permissionString) },
+                            onGrantClick = { permissionLauncher.launch(permissionsToRequest) },
                             language = language
                         )
                     }
@@ -1654,7 +1674,6 @@ fun BottomPlayBar(
     style: Int
 ) {
     val context = LocalContext.current
-    val artworkBitmap = rememberTrackArtwork(context, track.uriString)
     val backgroundStyleColors = when (style) {
         1 -> MaterialTheme.colorScheme.surfaceVariant
         2 -> Color.Black.copy(alpha = 0.6f) // Glassmorphism translucent
@@ -1701,21 +1720,7 @@ fun BottomPlayBar(
                 .background(Color(0xFF141518)),
             contentAlignment = Alignment.Center
         ) {
-            if (artworkBitmap != null) {
-                Image(
-                    bitmap = artworkBitmap.asImageBitmap(),
-                    contentDescription = "Cover Art",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                )
-            } else {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_app_logo),
-                    contentDescription = "Cover Art",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
+            ArtworkImage(uriString = track.uriString, modifier = Modifier.fillMaxSize())
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(
@@ -1773,7 +1778,6 @@ fun TrackItemRow(
     style: Int
 ) {
     val context = LocalContext.current
-    val artworkBitmap = rememberTrackArtwork(context, track.uriString)
     val itemShape = when (style) {
         1 -> RoundedCornerShape(12.dp)
         2 -> RoundedCornerShape(16.dp)
@@ -1818,21 +1822,7 @@ fun TrackItemRow(
                     .background(Color(0xFFE5E5EA)),
                 contentAlignment = Alignment.Center
             ) {
-                if (artworkBitmap != null) {
-                    Image(
-                        bitmap = artworkBitmap.asImageBitmap(),
-                        contentDescription = "Cover Art",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_app_logo),
-                        contentDescription = "Cover Art",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+                ArtworkImage(uriString = track.uriString, modifier = Modifier.fillMaxSize())
                 if (isPlaying) {
                     Box(
                         modifier = Modifier
@@ -2012,6 +2002,30 @@ object ArtworkCache {
         }
     }
 }
+@Composable
+fun ArtworkImage(
+    uriString: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val artworkBitmap = rememberTrackArtwork(context, uriString)
+
+    if (artworkBitmap != null) {
+        Image(
+            bitmap = artworkBitmap.asImageBitmap(),
+            contentDescription = "Cover Art",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Image(
+            painter = painterResource(id = R.drawable.ic_app_logo),
+            contentDescription = "Cover Art",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    }
+}
 
 @Composable
 fun rememberTrackArtwork(context: Context, uriString: String?): Bitmap? {
@@ -2020,7 +2034,7 @@ fun rememberTrackArtwork(context: Context, uriString: String?): Bitmap? {
     
     if (bitmap == null) {
         LaunchedEffect(uriString) {
-            delay(150) // Delay to avoid loading during fast scrolling
+            delay(300) // Delay to avoid loading during fast scrolling
             if (ArtworkCache.cache.get(uriString) != null) {
                 bitmap = ArtworkCache.cache.get(uriString)
                 return@LaunchedEffect

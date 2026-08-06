@@ -1,0 +1,26 @@
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.selectFolder(uri)
+        }
+    }
+    // Storage permission launcher depending on SDK
+    } else {
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        viewModel.setPermissionGranted(isGranted)
+        if (isGranted && selectedFolderUri == null) {
+            try {
+                folderPickerLauncher.launch(null)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    // Check permission on startup
+    LaunchedEffect(Unit) {
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            context.checkSelfPermission(permissionString) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
