@@ -11,7 +11,9 @@ permissions:
 
 jobs:
   build:
-    runs-on: self-hosted
+    # Явно указываем все метки вашего раннера:
+    # если их несколько, сборка пойдёт только на тот, у которого есть все три
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout Repository
@@ -28,12 +30,17 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper  # использует gradle-wrapper.properties
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Assemble Debug APK
-        run: gradle assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/*.apk
