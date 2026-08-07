@@ -5,15 +5,12 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    # Явно указываем все метки вашего раннера:
-    # если их несколько, сборка пойдёт только на тот, у которого есть все три
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -31,8 +28,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
 
       - name: Assemble Debug APK
         run: gradle assembleDebug --no-daemon
@@ -41,4 +36,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
