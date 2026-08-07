@@ -18,7 +18,7 @@ object MusicPlayerEngine {
     private var mediaPlayer: MediaPlayer? = null
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
-    private var mediaSession: android.media.session.MediaSession? = null
+    var mediaSession: android.media.session.MediaSession? = null
 
     // Player state flows
     private val _currentTrack = MutableStateFlow<Track?>(null)
@@ -106,6 +106,7 @@ object MusicPlayerEngine {
                 prepare()
                 if (focusGranted) {
                     start()
+                    startPlaybackService(context)
                 }
             }
             mediaPlayer = player
@@ -156,6 +157,7 @@ object MusicPlayerEngine {
                     try {
                         player.start()
                         _isPlaying.value = true
+                        startPlaybackService(context)
                         startProgressTracker()
                         updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
                     } catch (e: Exception) {
@@ -425,5 +427,18 @@ object MusicPlayerEngine {
         mediaPlayer = null
         _isPlaying.value = false
         _currentTrack.value = null
+    }
+
+    private fun startPlaybackService(context: Context) {
+        try {
+            val serviceIntent = android.content.Intent(context, PlaybackService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
