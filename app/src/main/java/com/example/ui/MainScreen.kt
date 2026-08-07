@@ -1,7 +1,6 @@
 
 package com.example.ui
 
-import android.os.SharedMemory
 import android.net.Uri
 import android.os.Build
 import android.util.LruCache
