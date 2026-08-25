@@ -148,6 +148,75 @@ class SmartImageLoader private constructor(private val context: Context) {
     }
 
     /**
+     * Фоновая предварительная загрузка обложек в RAM-кэш (L1) при запуске приложения.
+     * Быстро подгружает готовые миниатюры из дискового кэша (L2) или извлекает их,
+     * чтобы скролл и интерфейс были плавными без задержек.
+     */
+    suspend fun preloadCovers(tracks: List<Track>) = withContext(Dispatchers.IO) {
+        if (tracks.isEmpty()) return@withContext
+        for (track in tracks) {
+            val uriString = track.uriString
+            if (ramCache.get(uriString) == null) {
+                try {
+                    loadCover(uriString)
+                } catch (e: Exception) {
+                    // Игнорируем единичные ошибки декодирования для непрерывности
+                }
+            }
+        }
+    }
+
+    /**
+     * Асинхронная предварительная загрузка через пул потоков
+     */
+    fun preloadCoversAsync(tracks: List<Track>) {
+        if (tracks.isEmpty()) return
+        executorService.submit {
+            for (track in tracks) {
+                val uriString = track.uriString
+                if (ramCache.get(uriString) == null) {
+                    try {
+                        val cacheKey = getCacheKey(uriString)
+                        val diskFile = File(cacheDir, "$cacheKey.png")
+
+                        if (diskFile.exists() && diskFile.length() > 0) {
+                            val diskBitmap = BitmapFactory.decodeFile(diskFile.absolutePath)
+                            if (diskBitmap != null) {
+                                ramCache.put(uriString, diskBitmap)
+                                continue
+                            }
+                        }
+
+                        val raw = extractEmbeddedPicture(uriString)
+                        if (raw != null) {
+                            val scaled = try {
+                                if (raw.width != THUMBNAIL_SIZE || raw.height != THUMBNAIL_SIZE) {
+                                    Bitmap.createScaledBitmap(raw, THUMBNAIL_SIZE, THUMBNAIL_SIZE, true)
+                                } else {
+                                    raw
+                                }
+                            } catch (e: Exception) {
+                                raw
+                            }
+                            try {
+                                FileOutputStream(diskFile).use { out ->
+                                    scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                    out.flush()
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                            ramCache.put(uriString, scaled)
+                        }
+                    } catch (e: Exception) {
+                        // ignore and continue
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Извлечение метаданных обложки через MediaMetadataRetriever
      */
     private fun extractEmbeddedPicture(uriString: String): Bitmap? {

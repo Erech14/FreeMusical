@@ -11,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.MusicDatabase
 import com.example.data.Track
 import com.example.data.TrackRepository
+import com.example.util.SmartImageLoader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -329,10 +331,13 @@ class MusicViewModel(
             }
         }
         
-        // Listen to tracks database and synch player playlist when db updates
+        // Listen to tracks database, sync player playlist and preload covers into RAM
         viewModelScope.launch {
             tracksState.collect { tracks ->
                 MusicPlayerEngine.setPlaylist(tracks)
+                if (tracks.isNotEmpty()) {
+                    SmartImageLoader.getInstance(context).preloadCovers(tracks)
+                }
             }
         }
     }
