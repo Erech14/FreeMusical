@@ -81,6 +81,10 @@ class PlaybackService : Service() {
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
 
+        com.example.util.SmartImageLoader.getInstance(this).getFromRam(track.uriString)?.let { artworkBitmap ->
+            builder.setLargeIcon(artworkBitmap)
+        }
+
 
         MusicPlayerEngine.mediaSession?.sessionToken?.let { token ->
             builder.style = Notification.MediaStyle()

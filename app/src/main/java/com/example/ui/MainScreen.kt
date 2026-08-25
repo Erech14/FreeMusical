@@ -74,6 +74,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import com.example.R
+import com.example.util.SmartImageLoader
+import com.example.util.rememberSmartCover
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -1459,39 +1461,7 @@ fun PlaybackTurntableDeck(
     style: Int,
     isDark: Boolean
 ) {
-    val context = LocalContext.current
-    var artworkBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(currentTrack?.uriString) {
-        val trackUriStr = currentTrack?.uriString
-        if (trackUriStr != null) {
-            withContext(Dispatchers.IO) {
-                val retriever = MediaMetadataRetriever()
-                try {
-                    val uri = Uri.parse(trackUriStr)
-                    context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                        retriever.setDataSource(pfd.fileDescriptor)
-                        val artBytes = retriever.embeddedPicture
-                        if (artBytes != null) {
-                            val bitmap = BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
-                            artworkBitmap = bitmap
-                        } else {
-                            artworkBitmap = null
-                        }
-                    }
-                } catch (e: Exception) {
-                    artworkBitmap = null
-                } finally {
-                    try {
-                        retriever.release()
-                    } catch (e: Exception) {
-                        // ignore
-                    }
-                }
-            }
-        } else {
-            artworkBitmap = null
-        }
-    }
+    val artworkBitmap = rememberSmartCover(currentTrack?.uriString)
     val deckShape = when (style) {
         1 -> RoundedCornerShape(28.dp) // Material Design
         2 -> RoundedCornerShape(20.dp) // Глассморфизм
@@ -1992,22 +1962,12 @@ fun LineEqualizerGlowing() {
         )
     }
 }
-object ArtworkCache {
-    private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
-    private val cacheSize = maxMemory / 8
-    val cache = object : LruCache<String, Bitmap>(cacheSize) {
-        override fun sizeOf(key: String, bitmap: Bitmap): Int {
-            return bitmap.byteCount / 1024
-        }
-    }
-}
 @Composable
 fun ArtworkImage(
     uriString: String?,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val artworkBitmap = rememberTrackArtwork(context, uriString)
+    val artworkBitmap = rememberSmartCover(uriString)
 
     if (artworkBitmap != null) {
         Image(
@@ -2028,55 +1988,7 @@ fun ArtworkImage(
 
 @Composable
 fun rememberTrackArtwork(context: Context, uriString: String?): Bitmap? {
-    if (uriString == null) return null
-    var bitmap by remember(uriString) { mutableStateOf<Bitmap?>(ArtworkCache.cache.get(uriString)) }
-    
-    if (bitmap == null) {
-        LaunchedEffect(uriString) {
-            delay(300) // Delay to avoid loading during fast scrolling
-            if (ArtworkCache.cache.get(uriString) != null) {
-                bitmap = ArtworkCache.cache.get(uriString)
-                return@LaunchedEffect
-            }
-            withContext(Dispatchers.IO) {
-                val retriever = MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(context, Uri.parse(uriString))
-                    val artBytes = retriever.embeddedPicture
-                    if (artBytes != null) {
-                        val options = BitmapFactory.Options()
-                        options.inJustDecodeBounds = true
-                        BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size, options)
-                        
-                        var inSampleSize = 1
-                        val reqWidth = 150
-                        val reqHeight = 150
-                        if (options.outHeight > reqHeight || options.outWidth > reqWidth) {
-                            val halfHeight = options.outHeight / 2
-                            val halfWidth = options.outWidth / 2
-                            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
-                                inSampleSize *= 2
-                            }
-                        }
-                        
-                        options.inJustDecodeBounds = false
-                        options.inSampleSize = inSampleSize
-                        
-                        val decoded = BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size, options)
-                        if (decoded != null) {
-                            ArtworkCache.cache.put(uriString, decoded)
-                            bitmap = decoded
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Ignore failure
-                } finally {
-                    retriever.release()
-                }
-            }
-        }
-    }
-    return bitmap
+    return rememberSmartCover(uriString)
 }
 fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000
