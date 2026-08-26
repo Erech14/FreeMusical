@@ -614,7 +614,11 @@ fun MainScreen(
                                                 modifier = Modifier.weight(1f),
                                                 contentPadding = PaddingValues(bottom = 160.dp) // Large space to float custom navigation
                                             ) {
-                                                items(filteredList, key = { it.uriString }) { track ->
+                                                items(
+                                                    items = filteredList,
+                                                    key = { it.uriString },
+                                                    contentType = { "track_row" }
+                                                ) { track ->
                                                     TrackItemRow(
                                                         track = track,
                                                         isCurrent = currentTrack?.uriString == track.uriString,
@@ -1969,20 +1973,25 @@ fun ArtworkImage(
 ) {
     val artworkBitmap = rememberSmartCover(uriString)
 
-    if (artworkBitmap != null) {
-        Image(
-            bitmap = artworkBitmap.asImageBitmap(),
-            contentDescription = "Cover Art",
-            modifier = modifier,
-            contentScale = ContentScale.Crop
-        )
-    } else {
-        Image(
-            painter = painterResource(id = R.drawable.ic_app_logo),
-            contentDescription = "Cover Art",
-            modifier = modifier,
-            contentScale = ContentScale.Crop
-        )
+    Box(
+        modifier = modifier.background(Color(0xFF1E1E24)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (artworkBitmap != null) {
+            Image(
+                bitmap = artworkBitmap.asImageBitmap(),
+                contentDescription = "Cover Art",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.ic_app_logo),
+                contentDescription = "Cover Art",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
     }
 }
 

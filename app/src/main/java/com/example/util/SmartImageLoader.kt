@@ -217,32 +217,30 @@ class SmartImageLoader private constructor(private val context: Context) {
     }
 
     /**
-     * Извлечение метаданных обложки через MediaMetadataRetriever
+     * Извлечение метаданных обложки через MediaMetadataRetriever с эффективным downsampling (inSampleSize)
      */
     private fun extractEmbeddedPicture(uriString: String): Bitmap? {
         val retriever = MediaMetadataRetriever()
         return try {
             val uri = Uri.parse(uriString)
-            if (uri.scheme == "content" || uri.scheme == "file") {
+            val artBytes = if (uri.scheme == "content" || uri.scheme == "file") {
                 context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
                     retriever.setDataSource(pfd.fileDescriptor)
-                    val artBytes = retriever.embeddedPicture
-                    if (artBytes != null) {
-                        BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
-                    } else null
+                    retriever.embeddedPicture
                 }
             } else {
                 retriever.setDataSource(uriString)
-                val artBytes = retriever.embeddedPicture
-                if (artBytes != null) {
-                    BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
-                } else {
-                    // Пробуем декодировать как обычный файл изображения
-                    val file = File(uriString)
-                    if (file.exists()) {
-                        BitmapFactory.decodeFile(file.absolutePath)
-                    } else null
-                }
+                retriever.embeddedPicture
+            }
+
+            if (artBytes != null) {
+                decodeSampledBitmapFromByteArray(artBytes, THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+            } else {
+                // Пробуем декодировать как обычный файл изображения с downsampling
+                val file = File(uriString)
+                if (file.exists()) {
+                    decodeSampledBitmapFromFile(file.absolutePath, THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+                } else null
             }
         } catch (e: Exception) {
             null
@@ -253,6 +251,67 @@ class SmartImageLoader private constructor(private val context: Context) {
                 // ignore
             }
         }
+    }
+
+    /**
+     * Эффективное декодирование массива байтов с расчетом inSampleSize для минимизации нагрузки на RAM и GC
+     */
+    private fun decodeSampledBitmapFromByteArray(data: ByteArray, reqWidth: Int, reqHeight: Int): Bitmap? {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(data, 0, data.size, options)
+
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+        options.inJustDecodeBounds = false
+        options.inPreferredConfig = Bitmap.Config.RGB_565 // 50% экономия RAM без потери видимого качества
+
+        return try {
+            BitmapFactory.decodeByteArray(data, 0, data.size, options)
+        } catch (e: OutOfMemoryError) {
+            System.gc()
+            null
+        }
+    }
+
+    /**
+     * Эффективное декодирование файла с расчетом inSampleSize
+     */
+    private fun decodeSampledBitmapFromFile(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeFile(path, options)
+
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+        options.inJustDecodeBounds = false
+        options.inPreferredConfig = Bitmap.Config.RGB_565
+
+        return try {
+            BitmapFactory.decodeFile(path, options)
+        } catch (e: OutOfMemoryError) {
+            System.gc()
+            null
+        }
+    }
+
+    /**
+     * Расчет оптимального коэффициента масштабирования (степени двойки) для декодера
+     */
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     /**
