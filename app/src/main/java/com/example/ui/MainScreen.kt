@@ -1971,15 +1971,15 @@ fun ArtworkImage(
     uriString: String?,
     modifier: Modifier = Modifier
 ) {
-    val artworkBitmap = rememberSmartCover(uriString)
+    val imageBitmap = com.example.util.rememberSmartImageBitmap(uriString)
 
     Box(
         modifier = modifier.background(Color(0xFF1E1E24)),
         contentAlignment = Alignment.Center
     ) {
-        if (artworkBitmap != null) {
+        if (imageBitmap != null) {
             Image(
-                bitmap = artworkBitmap.asImageBitmap(),
+                bitmap = imageBitmap,
                 contentDescription = "Cover Art",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -33,7 +34,8 @@ import java.util.concurrent.Executors
 
 /**
  * Двухуровневый загрузчик и кэшер обложек треков (RAM L1 + Дисковый L2 кэш).
- * Обеспечивает мгновенный доступ к обложкам после первого запуска и сохранение миниатюр (200x200) в формате PNG.
+ * Обеспечивает мгновенный доступ к обложкам в ОЗУ сразу при запуске приложения
+ * и мгновенную отрисовку без задержек в Compose.
  */
 class SmartImageLoader private constructor(private val context: Context) {
 
@@ -52,15 +54,19 @@ class SmartImageLoader private constructor(private val context: Context) {
 
     // Кэш первого уровня (RAM) с ограничением по объему памяти
     private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
-    private val cacheSize = maxMemory / 8 // 1/8 от всей доступной оперативной памяти
+    private val cacheSize = maxMemory / 6 // До 1/6 оперативной памяти для быстрого кэша
+
     private val ramCache = object : LruCache<String, Bitmap>(cacheSize) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int {
             return bitmap.byteCount / 1024
         }
     }
 
+    // Кэш скомпилированных ImageBitmap для мгновенной отрисовки в Jetpack Compose без повторной конверсии
+    private val composeImageCache = ConcurrentHashMap<String, ImageBitmap>()
+
     // Пул потоков для фоновой загрузки, декодирования и дискового кэширования
-    private val executorService: ExecutorService = Executors.newFixedThreadPool(4)
+    private val executorService: ExecutorService = Executors.newFixedThreadPool(3)
 
     // Директория для дискового кэша (L2)
     private val cacheDir: File = File(context.cacheDir, "artwork_cache").apply {
@@ -90,6 +96,19 @@ class SmartImageLoader private constructor(private val context: Context) {
     }
 
     /**
+     * Получить готовый ImageBitmap для Jetpack Compose синхронно
+     */
+    fun getComposeImageFromRam(key: String): ImageBitmap? {
+        val cached = composeImageCache[key]
+        if (cached != null) return cached
+
+        val bitmap = ramCache.get(key) ?: return null
+        val imageBitmap = bitmap.asImageBitmap()
+        composeImageCache[key] = imageBitmap
+        return imageBitmap
+    }
+
+    /**
      * Асинхронная загрузка обложки трека с двухуровневым кэшированием (RAM -> Disk -> Extraction)
      */
     suspend fun loadCover(trackUriString: String?): Bitmap? = withContext(Dispatchers.IO) {
@@ -98,6 +117,9 @@ class SmartImageLoader private constructor(private val context: Context) {
         // 1. Проверка оперативного кэша (RAM)
         val cachedRam = ramCache.get(trackUriString)
         if (cachedRam != null) {
+            if (!composeImageCache.containsKey(trackUriString)) {
+                composeImageCache[trackUriString] = cachedRam.asImageBitmap()
+            }
             return@withContext cachedRam
         }
 
@@ -110,6 +132,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                 val diskBitmap = BitmapFactory.decodeFile(diskFile.absolutePath)
                 if (diskBitmap != null) {
                     ramCache.put(trackUriString, diskBitmap)
+                    composeImageCache[trackUriString] = diskBitmap.asImageBitmap()
                     return@withContext diskBitmap
                 }
             } catch (e: Exception) {
@@ -143,6 +166,7 @@ class SmartImageLoader private constructor(private val context: Context) {
 
         // 6. Помещение в оперативный кэш
         ramCache.put(trackUriString, scaledBitmap)
+        composeImageCache[trackUriString] = scaledBitmap.asImageBitmap()
 
         return@withContext scaledBitmap
     }
@@ -150,7 +174,7 @@ class SmartImageLoader private constructor(private val context: Context) {
     /**
      * Фоновая предварительная загрузка обложек в RAM-кэш (L1) при запуске приложения.
      * Быстро подгружает готовые миниатюры из дискового кэша (L2) или извлекает их,
-     * чтобы скролл и интерфейс были плавными без задержек.
+     * чтобы скролл и интерфейс были абсолютно плавными без задержек.
      */
     suspend fun preloadCovers(tracks: List<Track>) = withContext(Dispatchers.IO) {
         if (tracks.isEmpty()) return@withContext
@@ -160,7 +184,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                 try {
                     loadCover(uriString)
                 } catch (e: Exception) {
-                    // Игнорируем единичные ошибки декодирования для непрерывности
+                    // Игнорируем единичные ошибки декодирования
                 }
             }
         }
@@ -389,26 +413,49 @@ class SmartImageLoader private constructor(private val context: Context) {
 }
 
 /**
- * Jetpack Compose хук для автоматической реактивной подгрузки обложки через SmartImageLoader.
+ * Jetpack Compose хук для автоматической реактивной подгрузки обложки через SmartImageLoader (Bitmap).
  */
 @Composable
 fun rememberSmartCover(uriString: String?): Bitmap? {
+    if (uriString == null) return null
     val context = LocalContext.current
     val loader = remember { SmartImageLoader.getInstance(context) }
-    var bitmap by remember(uriString) {
-        mutableStateOf(if (uriString != null) loader.getFromRam(uriString) else null)
-    }
+    val cached = loader.getFromRam(uriString)
+    var bitmap by remember(uriString) { mutableStateOf(cached) }
 
-    LaunchedEffect(uriString) {
-        if (uriString != null) {
+    if (bitmap == null) {
+        LaunchedEffect(uriString) {
             val loaded = loader.loadCover(uriString)
-            bitmap = loaded
-        } else {
-            bitmap = null
+            if (loaded != null) {
+                bitmap = loaded
+            }
         }
     }
 
-    return bitmap
+    return bitmap ?: cached
+}
+
+/**
+ * Jetpack Compose хук для прямого получения ImageBitmap без пересчета на каждый кадр.
+ */
+@Composable
+fun rememberSmartImageBitmap(uriString: String?): ImageBitmap? {
+    if (uriString == null) return null
+    val context = LocalContext.current
+    val loader = remember { SmartImageLoader.getInstance(context) }
+    val cached = loader.getComposeImageFromRam(uriString)
+    var imageBitmap by remember(uriString) { mutableStateOf(cached) }
+
+    if (imageBitmap == null) {
+        LaunchedEffect(uriString) {
+            val loaded = loader.loadCover(uriString)
+            if (loaded != null) {
+                imageBitmap = loader.getComposeImageFromRam(uriString)
+            }
+        }
+    }
+
+    return imageBitmap ?: cached
 }
 
 /**
@@ -420,11 +467,11 @@ fun SmartArtworkImage(
     modifier: Modifier = Modifier,
     contentDescription: String = "Cover Art"
 ) {
-    val bitmap = rememberSmartCover(uriString)
+    val imageBitmap = rememberSmartImageBitmap(uriString)
 
-    if (bitmap != null) {
+    if (imageBitmap != null) {
         Image(
-            bitmap = bitmap.asImageBitmap(),
+            bitmap = imageBitmap,
             contentDescription = contentDescription,
             modifier = modifier,
             contentScale = ContentScale.Crop
