@@ -120,6 +120,7 @@ object MusicPlayerEngine {
             _currentPosition.value = 0L
 
             player.setOnCompletionListener {
+                ListeningStatsManager.onTrackCompleted()
                 scope.launch {
                     delay(150)
                     playNext(context)

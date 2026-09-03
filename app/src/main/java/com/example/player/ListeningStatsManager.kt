@@ -47,17 +47,31 @@ object ListeningStatsManager {
         }
     }
 
+    fun onTrackCompleted() {
+        scope.launch {
+            if (currentTrackTitle.isNotEmpty() && history.isNotEmpty()) {
+                val lastIdx = history.size - 1
+                maxPositionReached = currentDuration // Force 100%
+                history[lastIdx] = TrackStat(currentTrackTitle, 100, "прослушан полностью")
+                saveToJson()
+            }
+        }
+    }
+
     fun onTrackChanged(track: Track?) {
         scope.launch {
             if (currentTrackTitle.isNotEmpty()) {
                 // Finalize previous track in history
-                val pct = if (currentDuration > 0) ((maxPositionReached.toDouble() / currentDuration) * 100).toInt().coerceIn(0, 100) else 0
-                val status = if (pct < 10) "пропущено" else "прослушан полностью"
-                
-                // Update the last element in the history (which was the current track)
-                if (history.isNotEmpty()) {
-                    val lastIdx = history.size - 1
-                    history[lastIdx] = TrackStat(currentTrackTitle, pct, status)
+                val lastStatus = if (history.isNotEmpty()) history.last().status else ""
+                if (lastStatus != "прослушан полностью") {
+                    val pct = if (currentDuration > 0) ((maxPositionReached.toDouble() / currentDuration) * 100).toInt().coerceIn(0, 100) else 0
+                    val status = if (pct == 100) "прослушан полностью" else if (pct >= 5) "прервано" else "пропущено"
+                    
+                    // Update the last element in the history
+                    if (history.isNotEmpty()) {
+                        val lastIdx = history.size - 1
+                        history[lastIdx] = TrackStat(currentTrackTitle, pct, status)
+                    }
                 }
             }
             
@@ -68,7 +82,7 @@ object ListeningStatsManager {
                 
                 // Add new current track to history with 0% initially
                 history.add(TrackStat(currentTrackTitle, 0, "текущий трек, который сейчас слушает пользователь"))
-                if (history.size > 6) {
+                while (history.size > 6) {
                     history.removeAt(0)
                 }
                 
@@ -101,7 +115,9 @@ object ListeningStatsManager {
         val pct = if (currentDuration > 0) ((maxPositionReached.toDouble() / currentDuration) * 100).toInt().coerceIn(0, 100) else 0
         if (history.isNotEmpty()) {
             val lastIdx = history.size - 1
-            history[lastIdx] = TrackStat(currentTrackTitle, pct, "текущий трек, который сейчас слушает пользователь")
+            if (history[lastIdx].status != "прослушан полностью") {
+                history[lastIdx] = TrackStat(currentTrackTitle, pct, "текущий трек, который сейчас слушает пользователь")
+            }
         }
         saveToJson()
     }
