@@ -67,7 +67,12 @@ object Strings {
             "logs_search_placeholder" to "Search logs...",
             "logs_menu_item" to "Application & API Logs",
             "token_saved" to "Token saved successfully!",
-            "saved" to "Saved ✓"
+            "saved" to "Saved ✓",
+            "export_stats_title" to "Listening Statistics",
+            "export_stats_desc" to "Export listening history and statistics to a JSON file",
+            "export_stats_btn" to "Export JSON",
+            "export_stats_success" to "Statistics exported successfully!",
+            "export_stats_empty" to "No stats available yet"
         ),
         "Russian" to mapOf(
             "tab_main" to "Главная",
@@ -130,7 +135,12 @@ object Strings {
             "logs_search_placeholder" to "Поиск по логам...",
             "logs_menu_item" to "Логи приложения и API",
             "token_saved" to "Токен успешно сохранён!",
-            "saved" to "Сохранено ✓"
+            "saved" to "Сохранено ✓",
+            "export_stats_title" to "Статистика прослушивания",
+            "export_stats_desc" to "Экспортировать историю и статистику прослушивания в JSON файл",
+            "export_stats_btn" to "Экспорт JSON",
+            "export_stats_success" to "Статистика успешно экспортирована!",
+            "export_stats_empty" to "Статистика пока пуста"
         ),
         "Cute Russian" to mapOf(
             "tab_main" to "Главная ^_^",
@@ -193,7 +203,12 @@ object Strings {
             "logs_search_placeholder" to "Поиск по логикам...",
             "logs_menu_item" to "Логи приложения и API",
             "token_saved" to "Токенчик сохранён! ^_^",
-            "saved" to "Сохранено! <3"
+            "saved" to "Сохранено! <3",
+            "export_stats_title" to "Статистика прослушивания :3",
+            "export_stats_desc" to "Экспортировать историю и статистикушечку прослушивания в JSON файлик",
+            "export_stats_btn" to "Экспорт JSON",
+            "export_stats_success" to "Статистика успешно экспортирована! ^_^",
+            "export_stats_empty" to "Статистика пока пуста (T_T)"
         )
     )
 }

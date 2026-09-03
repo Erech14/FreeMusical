@@ -774,6 +774,29 @@ fun MainScreen(
                                         var tokenInput by remember(apiToken) { mutableStateOf(apiToken) }
                                         var tokenSavedSuccess by remember { mutableStateOf(false) }
                                         val settingsContext = LocalContext.current
+                                        val exportStatsLauncher = rememberLauncherForActivityResult(
+                                            contract = ActivityResultContracts.CreateDocument("application/json"),
+                                            onResult = { uri ->
+                                                uri?.let { destUri ->
+                                                    try {
+                                                        val statsFile = java.io.File(settingsContext.filesDir, "listening_stats.json")
+                                                        if (statsFile.exists()) {
+                                                            settingsContext.contentResolver.openOutputStream(destUri)?.use { out ->
+                                                                statsFile.inputStream().use { input ->
+                                                                    input.copyTo(out)
+                                                                }
+                                                            }
+                                                            android.widget.Toast.makeText(settingsContext, Strings.get("export_stats_success", language), android.widget.Toast.LENGTH_SHORT).show()
+                                                        } else {
+                                                            android.widget.Toast.makeText(settingsContext, Strings.get("export_stats_empty", language), android.widget.Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        e.printStackTrace()
+                                                        android.widget.Toast.makeText(settingsContext, "Error", android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            }
+                                        )
 
                                         LaunchedEffect(tokenSavedSuccess) {
                                             if (tokenSavedSuccess) {
@@ -987,6 +1010,53 @@ fun MainScreen(
                                                 }
                                                 Spacer(modifier = Modifier.height(24.dp))
                                                 
+                                                // EXPORT STATS LINK CARD
+                                                Text(
+                                                    text = Strings.get("export_stats_title", language),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                )
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(bottom = 24.dp),
+                                                    shape = RoundedCornerShape(16.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1F24)),
+                                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                                                ) {
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = Strings.get("export_stats_desc", language),
+                                                            color = Color.White.copy(alpha = 0.7f),
+                                                            fontSize = 14.sp,
+                                                            modifier = Modifier.padding(bottom = 16.dp)
+                                                        )
+                                                        Button(
+                                                            onClick = { 
+                                                                exportStatsLauncher.launch("listening_stats.json") 
+                                                            },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2D35)),
+                                                            shape = RoundedCornerShape(12.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Share,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF00F5D4),
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(Strings.get("export_stats_btn", language), color = Color.White, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                }
+
                                                 // LOGS SUBMENU LINK CARD
                                                 Text(
                                                     text = Strings.get("logs_title", language),

@@ -112,6 +112,8 @@ object MusicPlayerEngine {
             mediaPlayer = player
 
             _currentTrack.value = track
+            ListeningStatsManager.onTrackChanged(track)
+            
             _isPlaying.value = focusGranted
             wasPlayingBeforeFocusLoss = !focusGranted
             _duration.value = player.duration.toLong()
@@ -148,6 +150,7 @@ object MusicPlayerEngine {
                 player.pause()
                 _isPlaying.value = false
                 stopProgressTracker()
+                ListeningStatsManager.onPlaybackPaused()
                 updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
                 abandonAudioFocus()
                 wasPlayingBeforeFocusLoss = false
@@ -223,7 +226,9 @@ object MusicPlayerEngine {
             while (true) {
                 mediaPlayer?.let { player ->
                     if (player.isPlaying) {
-                        _currentPosition.value = player.currentPosition.toLong()
+                        val pos = player.currentPosition.toLong()
+                        _currentPosition.value = pos
+                        ListeningStatsManager.onProgressUpdated(pos)
                     }
                 }
                 delay(500)
@@ -272,6 +277,7 @@ object MusicPlayerEngine {
                         player.pause()
                         _isPlaying.value = false
                         stopProgressTracker()
+                        ListeningStatsManager.onPlaybackPaused()
                         updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
                     }
                 }
@@ -286,6 +292,7 @@ object MusicPlayerEngine {
                             player.pause()
                             _isPlaying.value = false
                             stopProgressTracker()
+                            ListeningStatsManager.onPlaybackPaused()
                             updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
                         }
                     }
@@ -347,6 +354,7 @@ object MusicPlayerEngine {
         if (appContext == null) {
             appContext = context.applicationContext
         }
+        ListeningStatsManager.init(context)
         if (mediaSession == null) {
             mediaSession = android.media.session.MediaSession(context, "MusicPlayerEngine").apply {
                 setCallback(object : android.media.session.MediaSession.Callback() {
