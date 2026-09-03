@@ -122,6 +122,26 @@ object ListeningStatsManager {
         saveToJson()
     }
 
+    fun clearStats() {
+        scope.launch {
+            try {
+                history.clear()
+                currentRecordId = 1
+                maxPositionReached = 0L
+                currentTrackTitle = ""
+                
+                appContext?.let { context ->
+                    val file = File(context.filesDir, "listening_stats.json")
+                    if (file.exists()) {
+                        file.writeText("[]")
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     @Synchronized
     private fun saveToJson() {
         val context = appContext ?: return

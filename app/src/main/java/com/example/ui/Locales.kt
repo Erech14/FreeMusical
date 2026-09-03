@@ -72,7 +72,9 @@ object Strings {
             "export_stats_desc" to "Export listening history and statistics to a JSON file",
             "export_stats_btn" to "Export JSON",
             "export_stats_success" to "Statistics exported successfully!",
-            "export_stats_empty" to "No stats available yet"
+            "export_stats_empty" to "No stats available yet",
+            "clear_stats_btn" to "Clear JSON",
+            "clear_stats_success" to "Statistics cleared!"
         ),
         "Russian" to mapOf(
             "tab_main" to "Главная",
@@ -140,7 +142,9 @@ object Strings {
             "export_stats_desc" to "Экспортировать историю и статистику прослушивания в JSON файл",
             "export_stats_btn" to "Экспорт JSON",
             "export_stats_success" to "Статистика успешно экспортирована!",
-            "export_stats_empty" to "Статистика пока пуста"
+            "export_stats_empty" to "Статистика пока пуста",
+            "clear_stats_btn" to "Очистить JSON",
+            "clear_stats_success" to "Статистика очищена!"
         ),
         "Cute Russian" to mapOf(
             "tab_main" to "Главная ^_^",
@@ -208,7 +212,9 @@ object Strings {
             "export_stats_desc" to "Экспортировать историю и статистикушечку прослушивания в JSON файлик",
             "export_stats_btn" to "Экспорт JSON",
             "export_stats_success" to "Статистика успешно экспортирована! ^_^",
-            "export_stats_empty" to "Статистика пока пуста (T_T)"
+            "export_stats_empty" to "Статистика пока пуста (T_T)",
+            "clear_stats_btn" to "Очистить JSON :3",
+            "clear_stats_success" to "Статистика стёрта! ^_^"
         )
     )
 }

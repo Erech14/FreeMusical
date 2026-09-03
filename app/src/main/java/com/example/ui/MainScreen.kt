@@ -1054,6 +1054,25 @@ fun MainScreen(
                                                             Spacer(modifier = Modifier.width(8.dp))
                                                             Text(Strings.get("export_stats_btn", language), color = Color.White, fontWeight = FontWeight.Bold)
                                                         }
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Button(
+                                                            onClick = { 
+                                                                com.example.player.ListeningStatsManager.clearStats()
+                                                                android.widget.Toast.makeText(settingsContext, Strings.get("clear_stats_success", language), android.widget.Toast.LENGTH_SHORT).show()
+                                                            },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2D35)),
+                                                            shape = RoundedCornerShape(12.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Delete,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFFFF5252),
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(Strings.get("clear_stats_btn", language), color = Color.White, fontWeight = FontWeight.Bold)
+                                                        }
                                                     }
                                                 }
 
