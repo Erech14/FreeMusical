@@ -23,7 +23,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.example.R
 import com.example.data.Track
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -60,13 +62,32 @@ class SmartImageLoader private constructor(private val context: Context) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int {
             return bitmap.byteCount / 1024
         }
+
+        override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {
+            // Держим второй кэш (Compose ImageBitmap) синхронным с LruCache,
+            // иначе он растёт безгранично и давит на память/GC при скролле.
+            composeImageCache.remove(key)
+        }
     }
 
     // Кэш скомпилированных ImageBitmap для мгновенной отрисовки в Jetpack Compose без повторной конверсии
     private val composeImageCache = ConcurrentHashMap<String, ImageBitmap>()
 
-    // Пул потоков для фоновой загрузки, декодирования и дискового кэширования
-    private val executorService: ExecutorService = Executors.newFixedThreadPool(3)
+    // Фоновый пул для предзагрузки: низкий приоритет, чтобы не отбирать CPU
+    // у потока отрисовки во время прокрутки списка.
+    private val executorService: ExecutorService = Executors.newFixedThreadPool(2) { runnable ->
+        Thread({
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+            runnable.run()
+        }, "cover-preload").apply { isDaemon = true }
+    }
+
+    // Декодирование «на лету» ограничено двумя потоками. Иначе при быстрой
+    // прокрутке распускается лавина параллельных декодирований и FPS падает.
+    private val decodeDispatcher: CoroutineDispatcher =
+        Executors.newFixedThreadPool(2) { runnable ->
+            Thread(runnable, "cover-decode").apply { isDaemon = true }
+        }.asCoroutineDispatcher()
 
     // Защита от повторного запуска предзагрузки (частые эмиссии списка треков)
     private val isPreloading = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -98,6 +119,37 @@ class SmartImageLoader private constructor(private val context: Context) {
         return ramCache.get(key)
     }
 
+    private fun cacheFile(uriString: String, extension: String): File =
+        File(cacheDir, "${getCacheKey(uriString)}.$extension")
+
+    /** Быстрое чтение дискового кэша: новые JPEG-файлы и старые PNG после обновления. */
+    private fun readDiskCache(uriString: String): Bitmap? {
+        for (ext in listOf("jpg", "png")) {
+            val file = cacheFile(uriString, ext)
+            if (file.exists() && file.length() > 0) {
+                try {
+                    // RGB_565 + downsampling: меньше памяти и быстрее декодирование.
+                    decodeSampledBitmapFromFile(file.absolutePath, THUMBNAIL_SIZE, THUMBNAIL_SIZE)?.let { return it }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        return null
+    }
+
+    /** Запись в дисковый кэш в JPEG: кодируется в разы быстрее PNG. */
+    private fun writeDiskCache(uriString: String, bitmap: Bitmap) {
+        try {
+            FileOutputStream(cacheFile(uriString, "jpg")).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                out.flush()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     /**
      * Получить готовый ImageBitmap для Jetpack Compose синхронно
      */
@@ -114,7 +166,7 @@ class SmartImageLoader private constructor(private val context: Context) {
     /**
      * Асинхронная загрузка обложки трека с двухуровневым кэшированием (RAM -> Disk -> Extraction)
      */
-    suspend fun loadCover(trackUriString: String?): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun loadCover(trackUriString: String?): Bitmap? = withContext(decodeDispatcher) {
         if (trackUriString.isNullOrBlank()) return@withContext null
 
         // 1. Проверка оперативного кэша (RAM)
@@ -126,21 +178,11 @@ class SmartImageLoader private constructor(private val context: Context) {
             return@withContext cachedRam
         }
 
-        val cacheKey = getCacheKey(trackUriString)
-        val diskFile = File(cacheDir, "$cacheKey.png")
-
         // 2. Проверка дискового кэша
-        if (diskFile.exists() && diskFile.length() > 0) {
-            try {
-                val diskBitmap = BitmapFactory.decodeFile(diskFile.absolutePath)
-                if (diskBitmap != null) {
-                    ramCache.put(trackUriString, diskBitmap)
-                    composeImageCache[trackUriString] = diskBitmap.asImageBitmap()
-                    return@withContext diskBitmap
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+        readDiskCache(trackUriString)?.let { diskBitmap ->
+            ramCache.put(trackUriString, diskBitmap)
+            composeImageCache[trackUriString] = diskBitmap.asImageBitmap()
+            return@withContext diskBitmap
         }
 
         // 3. Извлечение оригинальной обложки из аудиофайла
@@ -157,15 +199,8 @@ class SmartImageLoader private constructor(private val context: Context) {
             rawBitmap
         }
 
-        // 5. Сохранение на диск в формате PNG
-        try {
-            FileOutputStream(diskFile).use { out ->
-                scaledBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                out.flush()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // 5. Сохранение на диск в формате JPEG
+        writeDiskCache(trackUriString, scaledBitmap)
 
         // 6. Помещение в оперативный кэш
         ramCache.put(trackUriString, scaledBitmap)
@@ -207,15 +242,11 @@ class SmartImageLoader private constructor(private val context: Context) {
                     val uriString = track.uriString
                     if (ramCache.get(uriString) == null) {
                         try {
-                            val cacheKey = getCacheKey(uriString)
-                            val diskFile = File(cacheDir, "$cacheKey.png")
-
-                            if (diskFile.exists() && diskFile.length() > 0) {
-                                val diskBitmap = BitmapFactory.decodeFile(diskFile.absolutePath)
-                                if (diskBitmap != null) {
-                                    ramCache.put(uriString, diskBitmap)
-                                    continue
-                                }
+                            // Готовые обложки из дискового кэша подхватываем мгновенно
+                            val diskBitmap = readDiskCache(uriString)
+                            if (diskBitmap != null) {
+                                ramCache.put(uriString, diskBitmap)
+                                continue
                             }
 
                             val raw = extractEmbeddedPicture(uriString)
@@ -229,14 +260,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                                 } catch (e: Exception) {
                                     raw
                                 }
-                                try {
-                                    FileOutputStream(diskFile).use { out ->
-                                        scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                        out.flush()
-                                    }
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
+                                writeDiskCache(uriString, scaled)
                                 ramCache.put(uriString, scaled)
                             }
                         } catch (e: Exception) {
@@ -364,22 +388,13 @@ class SmartImageLoader private constructor(private val context: Context) {
         }
 
         executorService.submit {
-            val cacheKey = getCacheKey(trackUriString)
-            val diskFile = File(cacheDir, "$cacheKey.png")
-
-            if (diskFile.exists() && diskFile.length() > 0) {
-                try {
-                    val diskBitmap = BitmapFactory.decodeFile(diskFile.absolutePath)
-                    if (diskBitmap != null) {
-                        ramCache.put(trackUriString, diskBitmap)
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            onLoaded(diskBitmap)
-                        }
-                        return@submit
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
+            val diskBitmap = readDiskCache(trackUriString)
+            if (diskBitmap != null) {
+                ramCache.put(trackUriString, diskBitmap)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    onLoaded(diskBitmap)
                 }
+                return@submit
             }
 
             val raw = extractEmbeddedPicture(trackUriString)
@@ -389,14 +404,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                 } catch (e: Exception) {
                     raw
                 }
-                try {
-                    FileOutputStream(diskFile).use { out ->
-                        scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
-                        out.flush()
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                writeDiskCache(trackUriString, scaled)
                 ramCache.put(trackUriString, scaled)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     onLoaded(scaled)
@@ -414,6 +422,7 @@ class SmartImageLoader private constructor(private val context: Context) {
      */
     fun clearCache() {
         ramCache.evictAll()
+        composeImageCache.clear()
         try {
             cacheDir.listFiles()?.forEach { it.delete() }
         } catch (e: Exception) {

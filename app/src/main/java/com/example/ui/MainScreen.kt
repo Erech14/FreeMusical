@@ -1890,6 +1890,9 @@ fun TrackItemRow(
             else -> Color.Transparent
         }
     }
+    // Форматирование строк дорогое — считаем один раз на трек, а не на каждую перекомпоновку.
+    val formattedSize = remember(track.fileSize) { track.getFormattedFileSize() }
+    val formattedDate = remember(track.lastModified, track.dateAdded) { track.getFormattedDate() }
     val itemModifier = if (style == 2) {
         Modifier
             .fillMaxWidth()
@@ -1958,13 +1961,13 @@ fun TrackItemRow(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = track.getFormattedFileSize(),
+                        text = formattedSize,
                         color = Color(0xFF8E8E93),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Normal
                     )
                     Text(
-                        text = track.getFormattedDate(),
+                        text = formattedDate,
                         color = Color(0xFF8E8E93),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Normal
