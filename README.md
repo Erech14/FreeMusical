@@ -51,5 +51,75 @@ gradle assembleDebug
 gradle assembleRelease
 ```
 
+## Внешний Broadcast API (текущий трек)
+
+Приложение постоянно оповещает внешних слушателей о текущем треке через широковещательное
+сообщение с action:
+
+```
+erech14.freemusical.app.action.TRACK_STATE
+```
+
+Сообщение отправляется **неявно** (`sendBroadcast` без указания пакета), поэтому его может
+принимать любое приложение.
+
+### Когда отправляется
+
+| `event`            | Момент                                                                 |
+|--------------------|------------------------------------------------------------------------|
+| `TRACK_CHANGED`    | Сменился трек (в т.ч. старт нового).                                   |
+| `PLAYBACK_STATE`   | Изменилось play/pause или режим (shuffle).                            |
+| `POSITION`         | Heartbeat позиции раз в 1 с во время воспроизведения.                 |
+| `STOPPED`          | Воспроизведение остановлено, текущий трек сброшен.                    |
+
+### Extras
+
+| Ключ            | Тип       | Описание                                  |
+|-----------------|-----------|-------------------------------------------|
+| `event`         | `String`  | Одно из значений выше.                    |
+| `title`         | `String?` | Название трека.                           |
+| `artist`        | `String?` | Исполнитель.                              |
+| `album`         | `String?` | Альбом.                                   |
+| `uri`           | `String?` | `content://` URI исходного файла.          |
+| `durationMs`    | `Long`    | Длительность, мс.                         |
+| `positionMs`    | `Long`    | Текущая позиция, мс.                      |
+| `isPlaying`     | `Boolean` | Идёт ли воспроизведение.                  |
+| `shuffle`       | `Boolean` | Включён ли случайный порядок.             |
+| `index`         | `Int`     | Индекс трека в плейлисте (-1, если нет).  |
+| `playlistSize`  | `Int`     | Размер плейлиста воспроизведения.         |
+| `sessionId`     | `String`  | Идентификатор сессии (для сопоставления). |
+| `timestampMs`   | `Long`    | Время отправки, мс (`System.currentTimeMillis()`). |
+
+### Как слушать
+
+Неявные broadcast-ы не доставляются в ресиверы, объявленные в манифесте, начиная с Android 8
+(API 26). Слушатель обязан регистрировать ресивер в рантайме, а на Android 14 (API 34)+ —
+передавать флаг экспорта.
+
+```kotlin
+val filter = IntentFilter("erech14.freemusical.app.action.TRACK_STATE")
+val receiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val event = intent.getStringExtra("event") ?: return
+        val title = intent.getStringExtra("title")
+        val artist = intent.getStringExtra("artist")
+        // ...
+    }
+}
+
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    ContextCompat.registerReceiver(
+        context, receiver, filter, ContextCompat.RECEIVER_EXPORTED
+    )
+} else {
+    context.registerReceiver(receiver, filter)
+}
+```
+
+Ресивер работает, пока жив процесс слушателя; для фонового приёма запускайте foreground-сервис.
+
+> Примечание: системный UI (локскрин, шторка, Bluetooth, Android Auto) читает данные о треке
+> из `MediaSession`, а не из этого broadcast-а.
+
 
 

@@ -45,6 +45,12 @@ object MusicPlayerEngine {
     private var playingList: List<Track> = emptyList()
     private var currentPlayingIndex: Int = -1
 
+    /** Текущий индекс трека в плейлисте воспроизведения (-1, если не задан). */
+    val playlistIndex: Int get() = currentPlayingIndex
+
+    /** Размер текущего плейлиста воспроизведения. */
+    val playlistSize: Int get() = playingList.size
+
     fun setPlaylist(tracks: List<Track>) {
         originalList = tracks
         rebuildPlayingList(maintainPlayback = true)
@@ -381,6 +387,7 @@ object MusicPlayerEngine {
             appContext = context.applicationContext
         }
         ListeningStatsManager.init(context)
+        TrackBroadcaster.init(context)
         if (mediaSession == null) {
             Logger.debug("Инициализация MediaSession и регистрация приёмника наушников", "Player")
             mediaSession = android.media.session.MediaSession(context, "MusicPlayerEngine").apply {
