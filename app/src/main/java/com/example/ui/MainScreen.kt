@@ -102,6 +102,10 @@ fun MainScreen(
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val defaultPlaylistId by viewModel.defaultPlaylistId.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(0) }
+    // Onboarding wizard: auto-shown until completed by the user, re-openable from Settings.
+    val onboardingCompleted by viewModel.onboardingCompleted.collectAsStateWithLifecycle()
+    var showOnboardingManually by remember { mutableStateOf(false) }
+    val showOnboarding = !onboardingCompleted || showOnboardingManually
     var searchQuery by remember { mutableStateOf("") }
     // Debounce filtering so a large library is not re-filtered on every keystroke
     var debouncedSearchQuery by remember { mutableStateOf("") }
@@ -801,6 +805,7 @@ fun MainScreen(
                                         var tokenInput by remember(apiToken) { mutableStateOf(apiToken) }
                                         var tokenSavedSuccess by remember { mutableStateOf(false) }
                                         val settingsContext = LocalContext.current
+                                        val settingsScope = rememberCoroutineScope()
                                         val exportStatsLauncher = rememberLauncherForActivityResult(
                                             contract = ActivityResultContracts.CreateDocument("application/json"),
                                             onResult = { uri ->
@@ -839,6 +844,60 @@ fun MainScreen(
                                             contentPadding = PaddingValues(bottom = 160.dp)
                                         ) {
                                             item {
+                                                // HOW TO USE / ONBOARDING LINK CARD
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(bottom = 20.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .border(1.dp, Color(0xFF00F5D4).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                                        .clickable { showOnboardingManually = true },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(14.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(40.dp)
+                                                                .clip(CircleShape)
+                                                                .background(Color(0xFF00F5D4).copy(alpha = 0.15f)),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.MenuBook,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF00F5D4),
+                                                                modifier = Modifier.size(22.dp)
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.width(14.dp))
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = Strings.get("onb_menu_title", language),
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 15.sp,
+                                                                color = Color.White
+                                                            )
+                                                            Spacer(modifier = Modifier.height(2.dp))
+                                                            Text(
+                                                                text = Strings.get("onb_menu_subtitle", language),
+                                                                fontSize = 11.sp,
+                                                                color = Color.Gray
+                                                            )
+                                                        }
+                                                        Icon(
+                                                            imageVector = Icons.Default.KeyboardArrowRight,
+                                                            contentDescription = null,
+                                                            tint = Color.Gray,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
                                                 Text(
                                                     text = Strings.get("appearance", language),
                                                     fontWeight = FontWeight.Bold,
@@ -1103,6 +1162,59 @@ fun MainScreen(
                                                     }
                                                 }
 
+                                                // COVER CACHE LINK CARD
+                                                Text(
+                                                    text = Strings.get("cover_cache_title", language),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = contentColor,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                )
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(bottom = 24.dp),
+                                                    shape = RoundedCornerShape(16.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1F24)),
+                                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                                                ) {
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = Strings.get("cover_cache_desc", language),
+                                                            color = Color.White.copy(alpha = 0.7f),
+                                                            fontSize = 14.sp,
+                                                            modifier = Modifier.padding(bottom = 16.dp)
+                                                        )
+                                                        Button(
+                                                            onClick = {
+                                                                // Удаление файлов кэша — в фоне, чтобы не подвешивать UI.
+                                                                settingsScope.launch {
+                                                                    withContext(Dispatchers.IO) {
+                                                                        SmartImageLoader.getInstance(settingsContext).clearCache()
+                                                                    }
+                                                                    Toast.makeText(settingsContext, Strings.get("cover_cache_success", language), Toast.LENGTH_SHORT).show()
+                                                                }
+                                                            },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2D35)),
+                                                            shape = RoundedCornerShape(12.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Image,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF00F5D4),
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(Strings.get("cover_cache_btn", language), color = Color.White, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                }
+
                                                 // LOGS SUBMENU LINK CARD
                                                 Text(
                                                     text = Strings.get("logs_title", language),
@@ -1336,6 +1448,22 @@ fun MainScreen(
                     }
                 }
             }
+        }
+        // First-launch onboarding wizard. Covers the whole screen (including the
+        // floating navigation) until the user finishes or skips it.
+        AnimatedVisibility(
+            visible = showOnboarding,
+            enter = fadeIn(animationSpec = tween(220)),
+            exit = fadeOut(animationSpec = tween(180))
+        ) {
+            OnboardingScreen(
+                language = language,
+                isDark = isDark,
+                onFinish = {
+                    showOnboardingManually = false
+                    viewModel.setOnboardingCompleted(true)
+                }
+            )
         }
         // Cheap dim scrim that fades in with the player (replaces the old full-screen blur)
         AnimatedVisibility(

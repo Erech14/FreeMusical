@@ -89,6 +89,16 @@ class MusicViewModel(
         Logger.info("API-токен сохранён (длина=${token.length})", tag = "Settings")
     }
 
+    // Onboarding: shown once on first launch, re-openable from Settings.
+    private val _onboardingCompleted = MutableStateFlow(prefs.getBoolean("onboarding_completed", false))
+    val onboardingCompleted = _onboardingCompleted.asStateFlow()
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        prefs.edit().putBoolean("onboarding_completed", completed).apply()
+        _onboardingCompleted.value = completed
+        Logger.info("Онбординг: completed=$completed", tag = "UI")
+    }
+
     // API logic
     private val _apiTracks = MutableStateFlow<List<com.example.api.TrackRemote>>(emptyList())
     val apiTracks = _apiTracks.asStateFlow()

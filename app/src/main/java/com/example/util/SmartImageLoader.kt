@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,6 +74,10 @@ class SmartImageLoader private constructor(private val context: Context) {
 
     // Кэш скомпилированных ImageBitmap для мгновенной отрисовки в Jetpack Compose без повторной конверсии
     private val composeImageCache = ConcurrentHashMap<String, ImageBitmap>()
+
+    // Инкрементируется при очистке кэша. Compose-хуки используют это значение как
+    // ключ remember, поэтому после clearCache() обложки перечитываются автоматически.
+    val cacheVersion = mutableIntStateOf(0)
 
     // Фоновый пул для предзагрузки: низкий приоритет, чтобы не отбирать CPU
     // у потока отрисовки во время прокрутки списка.
@@ -428,6 +433,7 @@ class SmartImageLoader private constructor(private val context: Context) {
     fun clearCache() {
         ramCache.evictAll()
         composeImageCache.clear()
+        cacheVersion.intValue++
         Logger.info("Кэш обложек очищен (RAM + диск)", tag = "Covers")
         try {
             cacheDir.listFiles()?.forEach { it.delete() }
@@ -445,11 +451,13 @@ fun rememberSmartCover(uriString: String?): Bitmap? {
     if (uriString == null) return null
     val context = LocalContext.current
     val loader = remember { SmartImageLoader.getInstance(context) }
+    // Читаем версию, чтобы после clearCache() этот хук пересоздал состояние и перечитал обложку.
+    val cacheVersion = loader.cacheVersion.intValue
     val cached = loader.getFromRam(uriString)
-    var bitmap by remember(uriString) { mutableStateOf(cached) }
+    var bitmap by remember(uriString, cacheVersion) { mutableStateOf(cached) }
 
     if (bitmap == null) {
-        LaunchedEffect(uriString) {
+        LaunchedEffect(uriString, cacheVersion) {
             val loaded = loader.loadCover(uriString)
             if (loaded != null) {
                 bitmap = loaded
@@ -468,11 +476,13 @@ fun rememberSmartImageBitmap(uriString: String?): ImageBitmap? {
     if (uriString == null) return null
     val context = LocalContext.current
     val loader = remember { SmartImageLoader.getInstance(context) }
+    // Читаем версию, чтобы после clearCache() этот хук пересоздал состояние и перечитал обложку.
+    val cacheVersion = loader.cacheVersion.intValue
     val cached = loader.getComposeImageFromRam(uriString)
-    var imageBitmap by remember(uriString) { mutableStateOf(cached) }
+    var imageBitmap by remember(uriString, cacheVersion) { mutableStateOf(cached) }
 
     if (imageBitmap == null) {
-        LaunchedEffect(uriString) {
+        LaunchedEffect(uriString, cacheVersion) {
             val loaded = loader.loadCover(uriString)
             if (loaded != null) {
                 imageBitmap = loader.getComposeImageFromRam(uriString)
