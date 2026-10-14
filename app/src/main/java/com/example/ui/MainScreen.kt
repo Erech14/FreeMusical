@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -106,6 +108,16 @@ fun MainScreen(
     val onboardingCompleted by viewModel.onboardingCompleted.collectAsStateWithLifecycle()
     var showOnboardingManually by remember { mutableStateOf(false) }
     val showOnboarding = !onboardingCompleted || showOnboardingManually
+    // Interactive on-screen manual (coach marks): live map of element -> bounds on screen.
+    val coachTargets = remember { mutableStateMapOf<String, Rect>() }
+    val coachTourCompleted by viewModel.coachTourCompleted.collectAsStateWithLifecycle()
+    var showCoachTour by remember { mutableStateOf(false) }
+    // Auto-run the manual once, right after the library is set up for the first time.
+    LaunchedEffect(onboardingCompleted, isPermissionGranted, selectedFolderUri, coachTourCompleted) {
+        if (onboardingCompleted && isPermissionGranted && selectedFolderUri != null && !coachTourCompleted) {
+            showCoachTour = true
+        }
+    }
     var searchQuery by remember { mutableStateOf("") }
     // Debounce filtering so a large library is not re-filtered on every keystroke
     var debouncedSearchQuery by remember { mutableStateOf("") }
@@ -370,7 +382,8 @@ fun MainScreen(
                                 onClick = {
                                     newPlaylistName = ""
                                     playlistCreatorLauncher.launch(null)
-                                }
+                                },
+                                modifier = Modifier.onGloballyPositioned { coachTargets["playlists_add"] = it.boundsInRoot() }
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
@@ -491,6 +504,7 @@ fun MainScreen(
                                                     .weight(1f)
                                                     .height(52.dp)
                                                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(26.dp))
+                                                    .onGloballyPositioned { coachTargets["search_input"] = it.boundsInRoot() }
                                                     .testTag("search_input"),
                                                 shape = RoundedCornerShape(26.dp),
                                                 colors = TextFieldDefaults.colors(
@@ -514,6 +528,7 @@ fun MainScreen(
                                                     .size(48.dp)
                                                     .background(Color.Black.copy(alpha = 0.3f), CircleShape)
                                                     .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                                                    .onGloballyPositioned { coachTargets["scan_button"] = it.boundsInRoot() }
                                                     .testTag("scan_button"),
                                                 enabled = !isScanning
                                             ) {
@@ -541,6 +556,7 @@ fun MainScreen(
                                         ) {
                                             Button(
                                                 onClick = { viewModel.playSequential() },
+                                                modifier = Modifier.onGloballyPositioned { coachTargets["play_in_order"] = it.boundsInRoot() },
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
                                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                                             ) {
@@ -550,6 +566,7 @@ fun MainScreen(
                                             }
                                             Button(
                                                 onClick = { viewModel.playRandomly() },
+                                                modifier = Modifier.onGloballyPositioned { coachTargets["play_shuffle"] = it.boundsInRoot() },
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF118270)),
                                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                                             ) {
@@ -851,7 +868,8 @@ fun MainScreen(
                                                         .padding(bottom = 20.dp)
                                                         .clip(RoundedCornerShape(12.dp))
                                                         .border(1.dp, Color(0xFF00F5D4).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                                        .clickable { showOnboardingManually = true },
+                                                        .onGloballyPositioned { coachTargets["settings_howto"] = it.boundsInRoot() }
+                                                        .clickable { showCoachTour = true },
                                                     shape = RoundedCornerShape(12.dp),
                                                     colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
                                                 ) {
@@ -1377,7 +1395,8 @@ fun MainScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .onGloballyPositioned { coachTargets["nav_bar"] = it.boundsInRoot() },
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1462,6 +1481,23 @@ fun MainScreen(
                 onFinish = {
                     showOnboardingManually = false
                     viewModel.setOnboardingCompleted(true)
+                }
+            )
+        }
+        // Interactive on-screen manual: dims the screen, spotlights one element at a time.
+        AnimatedVisibility(
+            visible = showCoachTour,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(180))
+        ) {
+            CoachMarkTour(
+                targets = coachTargets,
+                language = language,
+                isDark = isDark,
+                onSelectTab = { selectedTab = it },
+                onFinish = {
+                    showCoachTour = false
+                    viewModel.setCoachTourCompleted(true)
                 }
             )
         }

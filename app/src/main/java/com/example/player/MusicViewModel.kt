@@ -99,6 +99,17 @@ class MusicViewModel(
         Logger.info("Онбординг: completed=$completed", tag = "UI")
     }
 
+    // Interactive on-screen manual (coach marks): auto-shown once after the first setup,
+    // re-openable from Settings.
+    private val _coachTourCompleted = MutableStateFlow(prefs.getBoolean("coach_tour_completed", false))
+    val coachTourCompleted = _coachTourCompleted.asStateFlow()
+
+    fun setCoachTourCompleted(completed: Boolean) {
+        prefs.edit().putBoolean("coach_tour_completed", completed).apply()
+        _coachTourCompleted.value = completed
+        Logger.info("Интерактивный мануал: completed=$completed", tag = "UI")
+    }
+
     // API logic
     private val _apiTracks = MutableStateFlow<List<com.example.api.TrackRemote>>(emptyList())
     val apiTracks = _apiTracks.asStateFlow()
