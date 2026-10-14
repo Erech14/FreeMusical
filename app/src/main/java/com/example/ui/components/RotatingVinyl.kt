@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -12,36 +11,37 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.R
+import kotlinx.coroutines.isActive
 
 @Composable
 fun RotatingVinyl(
     isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "vinyl_rotation")
-    
-    // Smooth angle progression
-    val rotationAngle by if (isPlaying) {
-        infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 4000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "angle"
-        )
-    } else {
-        remember { mutableStateOf(0f) }
+    // The angle is kept across pause/resume so the record never snaps back to 0.
+    // It is driven from frame time (withFrameNanos) so the rotation is perfectly
+    // synced with the display refresh rate and stops instantly on pause.
+    var rotationAngle by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
+        var lastFrameNanos = withFrameNanos { it }
+        while (isActive) {
+            val nowNanos = withFrameNanos { it }
+            val deltaSeconds = (nowNanos - lastFrameNanos) / 1_000_000_000f
+            lastFrameNanos = nowNanos
+            // One full revolution per 4 seconds (90 deg/sec), same as before.
+            rotationAngle = (rotationAngle + deltaSeconds * 90f) % 360f
+        }
     }
 
     Box(
@@ -55,7 +55,7 @@ fun RotatingVinyl(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .rotate(rotationAngle)
+                .graphicsLayer { rotationZ = rotationAngle }
         ) {
             val width = size.width
             val height = size.height
@@ -96,7 +96,7 @@ fun RotatingVinyl(
             contentDescription = "Vinyl Logo Artwork",
             modifier = Modifier
                 .size(80.dp)
-                .rotate(rotationAngle)
+                .graphicsLayer { rotationZ = rotationAngle }
                 .clip(CircleShape),
             contentScale = ContentScale.Crop
         )

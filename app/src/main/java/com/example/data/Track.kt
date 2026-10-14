@@ -47,7 +47,14 @@ data class Track(
     // Formatted date like "09.06.2026"
     fun getFormattedDate(): String {
         val time = if (lastModified > 0) lastModified else dateAdded
-        val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-        return sdf.format(Date(time))
+        return dateFormatter.get()!!.format(Date(time))
+    }
+
+    companion object {
+        // SimpleDateFormat is not thread-safe, so keep one cached instance per thread
+        // instead of allocating a new formatter on every list row composition.
+        private val dateFormatter = object : ThreadLocal<SimpleDateFormat>() {
+            override fun initialValue(): SimpleDateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+        }
     }
 }

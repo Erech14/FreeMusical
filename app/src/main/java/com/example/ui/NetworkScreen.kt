@@ -638,7 +638,8 @@ fun NetworkScreen(viewModel: MusicViewModel, language: String, isDark: Boolean) 
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(bottom = 160.dp)
         ) {
-            items(filteredTracks) { track ->
+            items(filteredTracks, key = { it.id }) { track ->
+                val onDownload = remember(track) { { viewModel.downloadApiTrack(track) } }
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -660,7 +661,7 @@ fun NetworkScreen(viewModel: MusicViewModel, language: String, isDark: Boolean) 
                             } ?: Strings.get("artist_unknown", language)
                             Text("Uploaded by: $uploaderName", color = Color.LightGray, fontSize = 12.sp)
                         }
-                        IconButton(onClick = { viewModel.downloadApiTrack(track) }) {
+                        IconButton(onClick = onDownload) {
                             Icon(Icons.Default.CloudDownload, contentDescription = "Download", tint = Color(0xFF00F5D4))
                         }
                     }

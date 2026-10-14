@@ -32,6 +32,11 @@ data class LogEntry(
 object Logger {
     private var nextId = 1L
 
+    // Cached per-thread formatter: creating SimpleDateFormat on every log call was costly.
+    private val timeFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
+    }
+
     private val _appLogs = MutableStateFlow<List<LogEntry>>(emptyList())
     val appLogs = _appLogs.asStateFlow()
 
@@ -78,7 +83,7 @@ object Logger {
     }
 
     private fun createEntry(category: LogCategory, level: LogLevel, tag: String, message: String): LogEntry {
-        val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+        val timestamp = timeFormatter.get()!!.format(Date())
         return LogEntry(
             id = nextId++,
             timestamp = timestamp,

@@ -68,6 +68,9 @@ class SmartImageLoader private constructor(private val context: Context) {
     // Пул потоков для фоновой загрузки, декодирования и дискового кэширования
     private val executorService: ExecutorService = Executors.newFixedThreadPool(3)
 
+    // Защита от повторного запуска предзагрузки (частые эмиссии списка треков)
+    private val isPreloading = java.util.concurrent.atomic.AtomicBoolean(false)
+
     // Директория для дискового кэша (L2)
     private val cacheDir: File = File(context.cacheDir, "artwork_cache").apply {
         if (!exists()) {
@@ -195,47 +198,54 @@ class SmartImageLoader private constructor(private val context: Context) {
      */
     fun preloadCoversAsync(tracks: List<Track>) {
         if (tracks.isEmpty()) return
+        // Only one preload pass at a time: repeated list emissions would otherwise
+        // pile up concurrent decoding tasks and compete with the UI for CPU.
+        if (!isPreloading.compareAndSet(false, true)) return
         executorService.submit {
-            for (track in tracks) {
-                val uriString = track.uriString
-                if (ramCache.get(uriString) == null) {
-                    try {
-                        val cacheKey = getCacheKey(uriString)
-                        val diskFile = File(cacheDir, "$cacheKey.png")
+            try {
+                for (track in tracks) {
+                    val uriString = track.uriString
+                    if (ramCache.get(uriString) == null) {
+                        try {
+                            val cacheKey = getCacheKey(uriString)
+                            val diskFile = File(cacheDir, "$cacheKey.png")
 
-                        if (diskFile.exists() && diskFile.length() > 0) {
-                            val diskBitmap = BitmapFactory.decodeFile(diskFile.absolutePath)
-                            if (diskBitmap != null) {
-                                ramCache.put(uriString, diskBitmap)
-                                continue
+                            if (diskFile.exists() && diskFile.length() > 0) {
+                                val diskBitmap = BitmapFactory.decodeFile(diskFile.absolutePath)
+                                if (diskBitmap != null) {
+                                    ramCache.put(uriString, diskBitmap)
+                                    continue
+                                }
                             }
-                        }
 
-                        val raw = extractEmbeddedPicture(uriString)
-                        if (raw != null) {
-                            val scaled = try {
-                                if (raw.width != THUMBNAIL_SIZE || raw.height != THUMBNAIL_SIZE) {
-                                    Bitmap.createScaledBitmap(raw, THUMBNAIL_SIZE, THUMBNAIL_SIZE, true)
-                                } else {
+                            val raw = extractEmbeddedPicture(uriString)
+                            if (raw != null) {
+                                val scaled = try {
+                                    if (raw.width != THUMBNAIL_SIZE || raw.height != THUMBNAIL_SIZE) {
+                                        Bitmap.createScaledBitmap(raw, THUMBNAIL_SIZE, THUMBNAIL_SIZE, true)
+                                    } else {
+                                        raw
+                                    }
+                                } catch (e: Exception) {
                                     raw
                                 }
-                            } catch (e: Exception) {
-                                raw
-                            }
-                            try {
-                                FileOutputStream(diskFile).use { out ->
-                                    scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                    out.flush()
+                                try {
+                                    FileOutputStream(diskFile).use { out ->
+                                        scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                        out.flush()
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
                                 }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+                                ramCache.put(uriString, scaled)
                             }
-                            ramCache.put(uriString, scaled)
+                        } catch (e: Exception) {
+                            // ignore and continue
                         }
-                    } catch (e: Exception) {
-                        // ignore and continue
                     }
                 }
+            } finally {
+                isPreloading.set(false)
             }
         }
     }

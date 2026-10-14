@@ -336,7 +336,9 @@ class MusicViewModel(
             tracksState.collect { tracks ->
                 MusicPlayerEngine.setPlaylist(tracks)
                 if (tracks.isNotEmpty()) {
-                    SmartImageLoader.getInstance(context).preloadCovers(tracks)
+                    // Fire-and-forget on a bounded thread pool so a large scan does not
+                    // block this collector or starve the UI thread while scrolling.
+                    SmartImageLoader.getInstance(context).preloadCoversAsync(tracks)
                 }
             }
         }

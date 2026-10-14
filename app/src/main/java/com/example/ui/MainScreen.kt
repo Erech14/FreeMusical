@@ -28,16 +28,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -56,7 +55,6 @@ import com.example.ui.components.*
 import com.example.ui.components.RotatingVinyl
 import com.example.player.MusicViewModel
 import java.io.File
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -87,15 +85,12 @@ fun MainScreen(
     val selectedFolderUri by viewModel.selectedFolderUri.collectAsStateWithLifecycle()
     val tracks by viewModel.tracksState.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
-    val scanCount by viewModel.scanCount.collectAsStateWithLifecycle()
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsStateWithLifecycle()
     val mediaError by viewModel.mediaError.collectAsStateWithLifecycle()
     val language by viewModel.appLanguage.collectAsStateWithLifecycle()
-    val appStyle by viewModel.appStyle.collectAsStateWithLifecycle()
     val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
     val isDark = when (appTheme) {
         0 -> true
@@ -108,6 +103,12 @@ fun MainScreen(
     val defaultPlaylistId by viewModel.defaultPlaylistId.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
+    // Debounce filtering so a large library is not re-filtered on every keystroke
+    var debouncedSearchQuery by remember { mutableStateOf("") }
+    LaunchedEffect(searchQuery) {
+        delay(200)
+        debouncedSearchQuery = searchQuery
+    }
     var isPlayerDetailedOpened by remember { mutableStateOf(false) }
     var showPlaylistNameDialog by remember { mutableStateOf(false) }
     var pendingPlaylistUri by remember { mutableStateOf<Uri?>(null) }
@@ -285,17 +286,20 @@ fun MainScreen(
         )
     }
     // Deep glowing sea-violet backdrop gradient for Dark, pure white for Light (high contrast)
-    val backgroundStyleColors = if (isDark) {
-        listOf(Color(0xFF171329), Color(0xFF0B2B28))
-    } else {
-        listOf(Color.White, Color.White)
+    // Remembered so it is not re-allocated on every recomposition.
+    val backgroundBrush = remember(isDark) {
+        val colors = if (isDark) {
+            listOf(Color(0xFF171329), Color(0xFF0B2B28))
+        } else {
+            listOf(Color.White, Color.White)
+        }
+        Brush.linearGradient(colors)
     }
-    Box(modifier = Modifier.fillMaxSize().background(Brush.linearGradient(backgroundStyleColors))) {
+    Box(modifier = Modifier.fillMaxSize().background(backgroundBrush)) {
         Scaffold(
             modifier = modifier
                 .fillMaxSize()
-                .background(Color.Transparent)
-                .blur(if (isPlayerDetailedOpened) 16.dp else 0.dp),
+                .background(Color.Transparent),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
@@ -390,14 +394,17 @@ fun MainScreen(
                         AnimatedContent(
                             targetState = selectedTab,
                             transitionSpec = {
+                                // Disable the default size animation: full-screen tabs do not
+                                // change size, and animating it causes needless relayout jank.
+                                val sizeTransform = SizeTransform(clip = false)
                                 if (targetState > initialState) {
-                                    (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
-                                        slideOutHorizontally { width -> -width } + fadeOut()
-                                    )
+                                    (slideInHorizontally { width -> width } + fadeIn())
+                                        .togetherWith(slideOutHorizontally { width -> -width } + fadeOut())
+                                        .using(sizeTransform)
                                 } else {
-                                    (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
-                                        slideOutHorizontally { width -> width } + fadeOut()
-                                    )
+                                    (slideInHorizontally { width -> -width } + fadeIn())
+                                        .togetherWith(slideOutHorizontally { width -> width } + fadeOut())
+                                        .using(sizeTransform)
                                 }
                             },
                             label = "tab_transition",
@@ -599,14 +606,14 @@ fun MainScreen(
                                                 }
                                             }
                                         } else {
-                                            val filteredList = remember(tracks, searchQuery) {
-                                                if (searchQuery.isBlank()) {
+                                            val filteredList = remember(tracks, debouncedSearchQuery) {
+                                                if (debouncedSearchQuery.isBlank()) {
                                                     tracks
                                                 } else {
                                                     tracks.filter {
-                                                        it.fileName.contains(searchQuery, ignoreCase = true) ||
-                                                                it.title.contains(searchQuery, ignoreCase = true) ||
-                                                                it.artist.contains(searchQuery, ignoreCase = true)
+                                                        it.fileName.contains(debouncedSearchQuery, ignoreCase = true) ||
+                                                                it.title.contains(debouncedSearchQuery, ignoreCase = true) ||
+                                                                it.artist.contains(debouncedSearchQuery, ignoreCase = true)
                                                     }
                                                 }
                                             }
@@ -619,16 +626,22 @@ fun MainScreen(
                                                     key = { it.uriString },
                                                     contentType = { "track_row" }
                                                 ) { track ->
+                                                    // Stable callbacks so unchanged rows can be skipped
+                                                    // during recomposition instead of being rebuilt.
+                                                    val onTrackClick = remember(track) { { viewModel.playTrack(track) } }
+                                                    val onTrackUpload = remember(track) {
+                                                        {
+                                                            uploadTitle = track.title
+                                                            uploadArtists = track.artist
+                                                            trackToUpload = track
+                                                        }
+                                                    }
                                                     TrackItemRow(
                                                         track = track,
                                                         isCurrent = currentTrack?.uriString == track.uriString,
                                                         isPlaying = isPlaying && currentTrack?.uriString == track.uriString,
-                                                        onClick = { viewModel.playTrack(track) },
-                                                        onUploadClick = {
-                                                            uploadTitle = track.title
-                                                            uploadArtists = track.artist
-                                                            trackToUpload = track
-                                                        },
+                                                        onClick = onTrackClick,
+                                                        onUploadClick = onTrackUpload,
                                                         style = 2 // Lock to Glassmorphism
                                                     )
                                                 }
@@ -1310,6 +1323,18 @@ fun MainScreen(
                 }
             }
         }
+        // Cheap dim scrim that fades in with the player (replaces the old full-screen blur)
+        AnimatedVisibility(
+            visible = isPlayerDetailedOpened,
+            enter = fadeIn(animationSpec = tween(220)),
+            exit = fadeOut(animationSpec = tween(160))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+            )
+        }
         // Expanded full-screen sliding vinyl turntable player sheet
         AnimatedVisibility(
             visible = isPlayerDetailedOpened,
@@ -1359,7 +1384,7 @@ fun MainScreen(
                     PlaybackTurntableDeck(
                         currentTrack = currentTrack,
                         isPlaying = isPlaying,
-                        currentPosition = currentPosition,
+                        currentPositionFlow = viewModel.currentPosition,
                         duration = duration,
                         isShuffleEnabled = isShuffleEnabled,
                         onPlayPauseClick = { viewModel.togglePlayPause() },
@@ -1542,7 +1567,7 @@ fun FolderSelectionOnboarding(
 fun PlaybackTurntableDeck(
     currentTrack: Track?,
     isPlaying: Boolean,
-    currentPosition: Long,
+    currentPositionFlow: kotlinx.coroutines.flow.StateFlow<Long>,
     duration: Long,
     isShuffleEnabled: Boolean,
     onPlayPauseClick: () -> Unit,
@@ -1555,6 +1580,16 @@ fun PlaybackTurntableDeck(
     isDark: Boolean
 ) {
     val artworkBitmap = rememberSmartCover(currentTrack?.uriString)
+    // Collect the high-frequency position here instead of in MainScreen so player
+    // ticks only recompose this deck, never the whole screen / track list.
+    val currentPosition by currentPositionFlow.collectAsStateWithLifecycle()
+    // Interpolate between the ~500ms engine ticks for a perfectly smooth progress bar.
+    val animatedPosition by animateFloatAsState(
+        targetValue = currentPosition.toFloat(),
+        animationSpec = tween(durationMillis = 500, easing = LinearEasing),
+        label = "position_tick"
+    )
+    val displayPosition = animatedPosition.toLong()
     val deckShape = when (style) {
         1 -> RoundedCornerShape(28.dp) // Material Design
         2 -> RoundedCornerShape(20.dp) // Глассморфизм
@@ -1613,7 +1648,7 @@ fun PlaybackTurntableDeck(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(14.dp))
-            val sliderPosition = if (duration > 0) currentPosition.toFloat() / duration else 0f
+            val sliderPosition = if (duration > 0) displayPosition.toFloat() / duration else 0f
             var isDragging by remember { mutableStateOf(false) }
             var dragPosition by remember { mutableStateOf(0f) }
             Row(
@@ -1623,7 +1658,7 @@ fun PlaybackTurntableDeck(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = formatDuration(if (isDragging) (dragPosition * duration).toLong() else currentPosition),
+                    text = formatDuration(if (isDragging) (dragPosition * duration).toLong() else displayPosition),
                     fontSize = 11.sp,
                     color = if (isDark) MutedText else Color(0xFF49454F),
                     modifier = Modifier.width(36.dp)
@@ -1840,15 +1875,20 @@ fun TrackItemRow(
     style: Int
 ) {
     val context = LocalContext.current
-    val itemShape = when (style) {
-        1 -> RoundedCornerShape(12.dp)
-        2 -> RoundedCornerShape(16.dp)
-        else -> RoundedCornerShape(0.dp)
+    val itemShape = remember(style) {
+        when (style) {
+            1 -> RoundedCornerShape(12.dp)
+            2 -> RoundedCornerShape(16.dp)
+            else -> RoundedCornerShape(0.dp)
+        }
     }
-    val itemBackgroundColor = when (style) {
-        1 -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        2 -> Color.Black.copy(alpha = 0.15f)
-        else -> Color.Transparent
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val itemBackgroundColor = remember(style, surfaceVariant) {
+        when (style) {
+            1 -> surfaceVariant.copy(alpha = 0.5f)
+            2 -> Color.Black.copy(alpha = 0.15f)
+            else -> Color.Transparent
+        }
     }
     val itemModifier = if (style == 2) {
         Modifier
@@ -1937,7 +1977,7 @@ fun TrackItemRow(
             }
         }
         HorizontalDivider(
-            color = Color(0xFFEEEEEE),
+            color = MaterialTheme.colorScheme.outlineVariant,
             thickness = 1.dp,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp)
         )
@@ -1982,19 +2022,31 @@ fun LineEqualizerGlowingSmall() {
         Box(
             modifier = Modifier
                 .width(2.dp)
-                .fillMaxHeight(bar1Height)
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleY = bar1Height
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
                 .background(Color.White)
         )
         Box(
             modifier = Modifier
                 .width(2.dp)
-                .fillMaxHeight(bar2Height)
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleY = bar2Height
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
                 .background(Color.White)
         )
         Box(
             modifier = Modifier
                 .width(2.dp)
-                .fillMaxHeight(bar3Height)
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleY = bar3Height
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
                 .background(Color.White)
         )
     }
@@ -2038,19 +2090,31 @@ fun LineEqualizerGlowing() {
         Box(
             modifier = Modifier
                 .width(3.dp)
-                .fillMaxHeight(bar1Height)
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleY = bar1Height
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
                 .background(PrimaryAmber, RoundedCornerShape(1.dp))
         )
         Box(
             modifier = Modifier
                 .width(3.dp)
-                .fillMaxHeight(bar2Height)
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleY = bar2Height
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
                 .background(PrimaryAmber, RoundedCornerShape(1.dp))
         )
         Box(
             modifier = Modifier
                 .width(3.dp)
-                .fillMaxHeight(bar3Height)
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleY = bar3Height
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
                 .background(PrimaryAmber, RoundedCornerShape(1.dp))
         )
     }

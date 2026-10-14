@@ -63,18 +63,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Throttle foreground rescans: a full SAF crawl on every onResume caused an
+    // IO/CPU spike and visible stutter right after returning to the app.
+    private var lastRescanElapsed = 0L
+
     override fun onResume() {
         super.onResume()
-        // Dynamically rescan directory when app comes to foreground
-        val currentUriStr = viewModel.selectedFolderUri.value
-        if (currentUriStr != null) {
-            try {
-                val uri = android.net.Uri.parse(currentUriStr)
-                viewModel.scanDirectory(uri)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+        val currentUriStr = viewModel.selectedFolderUri.value ?: return
+        if (viewModel.isScanning.value) return
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastRescanElapsed < RESCAN_THROTTLE_MS) return
+        lastRescanElapsed = now
+
+        try {
+            val uri = android.net.Uri.parse(currentUriStr)
+            viewModel.scanDirectory(uri)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
+    }
+
+    private companion object {
+        const val RESCAN_THROTTLE_MS = 10_000L
     }
 }
 
