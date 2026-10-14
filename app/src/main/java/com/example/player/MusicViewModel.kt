@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.MusicDatabase
 import com.example.data.Track
 import com.example.data.TrackRepository
+import com.example.ui.Logger
 import com.example.util.SmartImageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
@@ -85,7 +86,7 @@ class MusicViewModel(
     fun setApiToken(token: String) {
         prefs.edit().putString("api_token", token).apply()
         _apiToken.value = token
-        com.example.ui.Logger.logApp("API token saved (length: ${token.length})", tag = "Settings")
+        Logger.info("API-токен сохранён (длина=${token.length})", tag = "Settings")
     }
 
     // API logic
@@ -97,38 +98,48 @@ class MusicViewModel(
 
     fun fetchApiTracks() {
         if (_apiToken.value.isEmpty()) {
-            com.example.ui.Logger.log("fetchApiTracks: API Token is empty. Aborting.")
+            Logger.warn("fetchApiTracks: токен не задан, запрос отменён", "Network")
             return
         }
-        com.example.ui.Logger.log("fetchApiTracks: Starting fetch with token length: ${_apiToken.value.length}")
+        Logger.info("fetchApiTracks: запрос списка треков (token.length=${_apiToken.value.length})", "Network")
         viewModelScope.launch {
             _isApiLoading.value = true
+            val start = Logger.now()
             try {
-                com.example.ui.Logger.log("fetchApiTracks: Calling ApiClient.apiService.getTracks()")
                 val tracks = com.example.api.ApiClient.apiService.getTracks("Bearer ${_apiToken.value}")
-                com.example.ui.Logger.log("fetchApiTracks: Success! Received ${tracks.size} tracks.")
+                Logger.info("fetchApiTracks: получено ${tracks.size} треков", "Network")
+                Logger.logTiming("Network", "Загрузка списка треков", start)
                 _apiTracks.value = tracks
             } catch (e: Exception) {
-                com.example.ui.Logger.log("fetchApiTracks: Exception caught -> ${e.message}")
-                e.printStackTrace()
+                Logger.error("fetchApiTracks: ошибка запроса списка", e, "Network")
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "Failed to load tracks: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }
             } finally {
-                com.example.ui.Logger.log("fetchApiTracks: Finished loading.")
                 _isApiLoading.value = false
             }
         }
     }
 
     fun downloadApiTrack(track: com.example.api.TrackRemote) {
-        val folderUriStr = _selectedFolderUri.value ?: return
-        if (_apiToken.value.isEmpty()) return
+        val folderUriStr = _selectedFolderUri.value ?: run {
+            Logger.warn("downloadApiTrack: папка не выбрана", "Network")
+            return
+        }
+        if (_apiToken.value.isEmpty()) {
+            Logger.warn("downloadApiTrack: токен не задан", "Network")
+            return
+        }
+        Logger.info("downloadApiTrack: '${track.title}' (id=${track.id})", "Network")
         viewModelScope.launch {
+            val start = Logger.now()
             try {
                 val response = com.example.api.ApiClient.apiService.downloadTrack("Bearer ${_apiToken.value}", track.id)
                 if (response.isSuccessful) {
-                    val body = response.body() ?: return@launch
+                    val body = response.body() ?: run {
+                        Logger.warn("downloadApiTrack: пустой ответ для '${track.title}'", "Network")
+                        return@launch
+                    }
                     val uri = Uri.parse(folderUriStr)
                     val rootDocId = android.provider.DocumentsContract.getTreeDocumentId(uri)
                     val dirUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(uri, rootDocId)
@@ -164,19 +175,24 @@ class MusicViewModel(
                                 input.copyTo(out)
                             }
                         }
+                        Logger.info("downloadApiTrack: сохранён '$fileName'", "Network")
+                        Logger.logTiming("Network", "Скачивание '${track.title}'", start)
                         // Refresh directory
                         scanDirectory(uri)
                         withContext(kotlinx.coroutines.Dispatchers.Main) {
                             android.widget.Toast.makeText(context, "Track downloaded: $fileName", android.widget.Toast.LENGTH_SHORT).show()
                         }
+                    } else {
+                        Logger.warn("downloadApiTrack: не удалось создать файл '$fileName'", "Network")
                     }
                 } else {
+                    Logger.error("downloadApiTrack: HTTP ${response.code()} ${response.message()}", "Network")
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
                         android.widget.Toast.makeText(context, "Download failed", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Logger.error("downloadApiTrack: ошибка скачивания '${track.title}'", e, "Network")
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "Download error: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -185,12 +201,21 @@ class MusicViewModel(
     }
 
     fun uploadLocalTrack(track: Track, artists: String, title: String, forRussia: String, under18: String) {
-        if (_apiToken.value.isEmpty()) return
+        if (_apiToken.value.isEmpty()) {
+            Logger.warn("uploadLocalTrack: токен не задан, загрузка отменена", "Network")
+            return
+        }
+        Logger.info("uploadLocalTrack: '${track.fileName}' -> title='$title', artists='$artists'", "Network")
         viewModelScope.launch {
+            val start = Logger.now()
             try {
                 val uri = Uri.parse(track.uriString)
-                val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
+                val inputStream = context.contentResolver.openInputStream(uri) ?: run {
+                    Logger.warn("uploadLocalTrack: не удалось открыть '${track.fileName}'", "Network")
+                    return@launch
+                }
                 val bytes = inputStream.readBytes()
+                Logger.debug("uploadLocalTrack: прочитано ${bytes.size} байт", "Network")
                 val audioMediaType = "audio/mpeg".toMediaTypeOrNull()
                 val textMediaType = "text/plain".toMediaTypeOrNull()
 
@@ -210,11 +235,13 @@ class MusicViewModel(
                     forRussiaBody,
                     under18Body
                 )
+                Logger.info("uploadLocalTrack: успешно загружен '${track.fileName}'", "Network")
+                Logger.logTiming("Network", "Загрузка '${track.fileName}'", start)
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "Upload successful", android.widget.Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Logger.error("uploadLocalTrack: ошибка загрузки '${track.fileName}'", e, "Network")
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "Upload failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -225,7 +252,7 @@ class MusicViewModel(
     fun setAppTheme(theme: Int) {
         prefs.edit().putInt("app_theme", theme).apply()
         _appTheme.value = theme
-        com.example.ui.Logger.logApp("App theme updated: mode $theme", tag = "Settings")
+        Logger.info("Тема оформления изменена: режим $theme", tag = "Settings")
     }
 
     fun setAppStyle(style: Int) {
@@ -236,18 +263,26 @@ class MusicViewModel(
     fun setAppLanguage(lang: String) {
         prefs.edit().putString("app_language", lang).apply()
         _appLanguage.value = lang
-        com.example.ui.Logger.logApp("Language changed to: $lang", tag = "Settings")
+        Logger.info("Язык приложения изменён: $lang", tag = "Settings")
     }
 
     // Playback control from header
     fun playSequential() {
-        if (tracksState.value.isEmpty()) return
+        if (tracksState.value.isEmpty()) {
+            Logger.warn("playSequential: библиотека пуста", tag = "Player")
+            return
+        }
+        Logger.info("Воспроизведение по порядку (${tracksState.value.size} треков)", tag = "Player")
         if (isShuffleEnabled.value) toggleShuffle()
         playTrack(tracksState.value.first())
     }
 
     fun playRandomly() {
-        if (tracksState.value.isEmpty()) return
+        if (tracksState.value.isEmpty()) {
+            Logger.warn("playRandomly: библиотека пуста", tag = "Player")
+            return
+        }
+        Logger.info("Случайное воспроизведение (${tracksState.value.size} треков)", tag = "Player")
         if (!isShuffleEnabled.value) toggleShuffle()
         playTrack(tracksState.value.random())
     }
@@ -270,7 +305,9 @@ class MusicViewModel(
                 list.add(SimplePlaylist(obj.getString("id"), obj.getString("name"), obj.getString("uri")))
             }
             _playlists.value = list
-        } catch (e: Exception) { e.printStackTrace() }
+        } catch (e: Exception) {
+            Logger.error("Не удалось прочитать плейлисты из настроек", e, "Playlist")
+        }
     }
 
     fun savePlaylists(list: List<SimplePlaylist>) {
@@ -291,7 +328,7 @@ class MusicViewModel(
         val id = java.util.UUID.randomUUID().toString()
         newList.add(SimplePlaylist(id, name, uri.toString()))
         savePlaylists(newList)
-        com.example.ui.Logger.logApp("Created playlist '$name' ($uri)", tag = "Playlist")
+        Logger.info("Плейлист создан: '$name' ($uri)", tag = "Playlist")
     }
 
     fun deletePlaylist(id: String) {
@@ -300,17 +337,18 @@ class MusicViewModel(
         if (_defaultPlaylistId.value == id) {
             setDefaultPlaylist(null)
         }
-        com.example.ui.Logger.logApp("Deleted playlist ID: $id", tag = "Playlist")
+        Logger.info("Плейлист удалён: id=$id (осталось ${newList.size})", tag = "Playlist")
     }
 
     fun setDefaultPlaylist(id: String?) {
         prefs.edit().putString("default_playlist_id", id).apply()
         _defaultPlaylistId.value = id
+        Logger.debug("Плейлист по умолчанию: $id", tag = "Playlist")
     }
 
     init {
         loadPlaylists()
-        com.example.ui.Logger.logApp("ViewModel initialized. Loaded ${_playlists.value.size} playlists.", tag = "App")
+        Logger.info("ViewModel инициализирован: загружено ${_playlists.value.size} плейлистов", tag = "App")
         
         val defaultId = _defaultPlaylistId.value
         val defaultPlaylist = _playlists.value.find { it.id == defaultId }
@@ -326,7 +364,7 @@ class MusicViewModel(
             val uri = Uri.parse(startupUriStr)
             if (hasPersistedPermission(uri)) {
                 _selectedFolderUri.value = startupUriStr
-                com.example.ui.Logger.logApp("Restored folder URI from settings: $startupUriStr", tag = "Storage")
+                Logger.info("Восстановлена папка из настроек: $startupUriStr", tag = "Storage")
                 scanDirectory(uri)
             }
         }
@@ -346,6 +384,7 @@ class MusicViewModel(
 
     fun setPermissionGranted(isGranted: Boolean) {
         _isStoragePermissionGranted.value = isGranted
+        Logger.info("Разрешение на доступ к файлам: ${if (isGranted) "выдано" else "не выдано"}", tag = "Storage")
     }
 
     private fun hasPersistedPermission(uri: Uri): Boolean {
@@ -354,6 +393,7 @@ class MusicViewModel(
     }
 
     fun selectFolder(uri: Uri) {
+        Logger.info("Выбрана папка: $uri", tag = "Storage")
         try {
             // Take dynamic persistent permissions so SAF works across restarts
             val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -367,7 +407,7 @@ class MusicViewModel(
             // Trigger scanner
             scanDirectory(uri)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.error("Не удалось открыть выбранную папку $uri", e, "Storage")
         }
     }
 
@@ -394,15 +434,21 @@ class MusicViewModel(
     }
 
     fun scanDirectory(uri: Uri) {
-        com.example.ui.Logger.logApp("Scanning music directory: $uri", tag = "Scanner")
+        if (_isScanning.value) {
+            Logger.warn("scanDirectory: сканирование уже идёт, новый запуск пропущен ($uri)", tag = "Scanner")
+            return
+        }
+        Logger.info("Сканирование каталога: $uri", tag = "Scanner")
         viewModelScope.launch {
             _isScanning.value = true
             _scanCount.value = 0
-            
+            val start = Logger.now()
+
             val existingTracks = tracksState.value.associateBy { it.uriString }
+            Logger.debug("В кэше уже ${existingTracks.size} треков", tag = "Scanner")
             // Perform SAF content resolver crawl BEFORE clearing the library
             val discovered = repository.scanDirectoryForMusic(uri, existingTracks)
-            
+
             // Cache found files in local SQLite. We only clear and update if we successfully found files,
             // otherwise we retain existing files so they don't disappear on restarts.
             if (discovered.isNotEmpty()) {
@@ -410,9 +456,11 @@ class MusicViewModel(
                 _scanCount.value = discovered.size
             } else {
                 _scanCount.value = tracksState.value.size
+                Logger.warn("Сканирование не нашло файлов — библиотека оставлена без изменений", tag = "Scanner")
             }
-            com.example.ui.Logger.logApp("Directory scan completed: discovered ${_scanCount.value} audio tracks", tag = "Scanner")
-            
+            Logger.info("Сканирование завершено: найдено ${_scanCount.value} треков", tag = "Scanner")
+            Logger.logTiming("Scanner", "Обход каталога", start)
+
             createMainPlaylistIfNeeded(uri)
             _isScanning.value = false
         }
@@ -427,12 +475,12 @@ class MusicViewModel(
                 val releaseFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 context.contentResolver.releasePersistableUriPermission(uri, releaseFlags)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Logger.warn("Не удалось освободить разрешение на папку: ${e.message}", tag = "Storage")
             }
         }
         
         MusicPlayerEngine.release()
-        com.example.ui.Logger.logApp("Folder selection reset. Library cleared.", tag = "Storage")
+        Logger.info("Сброс папки, библиотека очищена", tag = "Storage")
         
         prefs.edit().remove("selected_folder_uri").apply()
         _selectedFolderUri.value = null
@@ -443,31 +491,31 @@ class MusicViewModel(
     }
 
     fun playTrack(track: Track) {
-        com.example.ui.Logger.logApp("Selected track: '${track.title}' by ${track.artist}", tag = "Player")
+        Logger.debug("UI: выбран трек '${track.title}' — ${track.artist}", tag = "Player")
         MusicPlayerEngine.playTrack(context, track)
     }
 
     fun togglePlayPause() {
-        com.example.ui.Logger.logApp("Toggled play/pause button", tag = "Player")
+        Logger.debug("UI: play/pause", tag = "Player")
         MusicPlayerEngine.togglePlayPause(context)
     }
 
     fun playNext() {
-        com.example.ui.Logger.logApp("Triggered skip to next track", tag = "Player")
+        Logger.debug("UI: следующий трек", tag = "Player")
         MusicPlayerEngine.playNext(context)
     }
 
     fun playPrevious() {
-        com.example.ui.Logger.logApp("Triggered skip to previous track", tag = "Player")
+        Logger.debug("UI: предыдущий трек", tag = "Player")
         MusicPlayerEngine.playPrevious(context)
     }
 
     fun toggleShuffle() {
         MusicPlayerEngine.toggleShuffle()
-        com.example.ui.Logger.logApp("Shuffle mode: ${if (isShuffleEnabled.value) "ENABLED" else "DISABLED"}", tag = "Player")
     }
     
     fun stopPlayback() {
+        Logger.info("Остановка воспроизведения (из UI)", tag = "Player")
         MusicPlayerEngine.release()
     }
 

@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
+import com.example.ui.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -40,13 +41,16 @@ class TrackRepository(
     suspend fun scanDirectoryForMusic(treeUri: Uri, existingTracks: Map<String, Track>): List<Track> = withContext(Dispatchers.IO) {
         val discoveredTracks = mutableListOf<Track>()
         val tasks = mutableListOf<Deferred<Track>>()
+        Logger.debug("Обход каталога $treeUri (в кэше ${existingTracks.size} треков)", tag = "Scanner")
         try {
             val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
             scanDocumentDir(this, treeUri, rootDocId, existingTracks, discoveredTracks, tasks)
             discoveredTracks.addAll(tasks.awaitAll())
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.error("Ошибка обхода каталога $treeUri", e, "Scanner")
         }
+        val reused = (discoveredTracks.size - tasks.size).coerceAtLeast(0)
+        Logger.debug("Обход завершён: ${discoveredTracks.size} треков (из кэша $reused, прочитано метаданных ${tasks.size})", tag = "Scanner")
         return@withContext discoveredTracks
     }
 
@@ -105,7 +109,7 @@ class TrackRepository(
                 } while (cursor.moveToNext())
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.warn("Ошибка при обходе подкаталога: ${e.message}", tag = "Scanner")
         } finally {
             cursor?.close()
         }
@@ -134,7 +138,7 @@ class TrackRepository(
                 duration = durationStr?.toLongOrNull() ?: 0L
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.warn("Не удалось прочитать метаданные '$displayName': ${e.message}", tag = "Scanner")
         } finally {
             try {
                 retriever.release()

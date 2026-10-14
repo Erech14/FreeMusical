@@ -23,6 +23,7 @@ import com.example.data.TrackRepository
 import com.example.player.MusicViewModel
 import com.example.player.MusicViewModelFactory
 import com.example.ui.MainScreen
+import com.example.ui.Logger
 import com.example.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Logger.info("MainActivity.onCreate", tag = "UI")
         enableEdgeToEdge()
         
         requestBatteryOptimization()
@@ -69,19 +71,32 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        Logger.debug("MainActivity.onResume", tag = "UI")
         val currentUriStr = viewModel.selectedFolderUri.value ?: return
-        if (viewModel.isScanning.value) return
+        if (viewModel.isScanning.value) {
+            Logger.debug("onResume: сканирование уже идёт, авто-обновление пропущено", tag = "Scanner")
+            return
+        }
 
         val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastRescanElapsed < RESCAN_THROTTLE_MS) return
+        if (now - lastRescanElapsed < RESCAN_THROTTLE_MS) {
+            Logger.debug("onResume: авто-обновление пропущено (троттлинг)", tag = "Scanner")
+            return
+        }
         lastRescanElapsed = now
+        Logger.info("onResume: авто-обновление библиотеки", tag = "Scanner")
 
         try {
             val uri = android.net.Uri.parse(currentUriStr)
             viewModel.scanDirectory(uri)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.error("onResume: не удалось запустить сканирование", e, "Scanner")
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Logger.debug("MainActivity.onPause", tag = "UI")
     }
 
     private companion object {

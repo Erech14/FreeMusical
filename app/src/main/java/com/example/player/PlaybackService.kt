@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import com.example.MainActivity
+import com.example.ui.Logger
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -21,6 +22,7 @@ class PlaybackService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Logger.debug("PlaybackService создан", tag = "Service")
         createNotificationChannel()
 
         job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
@@ -43,6 +45,7 @@ class PlaybackService : Service() {
                         notificationManager.notify(1, notification)
                         stopForeground(false)
                     }
+                    Logger.debug("Уведомление обновлено: '${track.title}' (playing=$isPlaying)", tag = "Service")
                 } else {
                     stopForeground(true)
                 }
@@ -101,6 +104,7 @@ class PlaybackService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         job?.cancel()
+        Logger.debug("PlaybackService уничтожен", tag = "Service")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

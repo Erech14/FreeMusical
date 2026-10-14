@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
 import com.example.data.Track
+import com.example.ui.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,11 +48,13 @@ object MusicPlayerEngine {
     fun setPlaylist(tracks: List<Track>) {
         originalList = tracks
         rebuildPlayingList(maintainPlayback = true)
+        Logger.debug("Плейлист обновлён: ${tracks.size} треков, shuffle=${_isShuffleEnabled.value}", "Player")
     }
 
     fun toggleShuffle() {
         _isShuffleEnabled.value = !_isShuffleEnabled.value
         rebuildPlayingList(maintainPlayback = true)
+        Logger.info("Режим воспроизведения: ${if (_isShuffleEnabled.value) "SHUFFLE" else "SEQUENTIAL"}", "Player")
     }
 
     private fun rebuildPlayingList(maintainPlayback: Boolean) {
@@ -88,8 +91,10 @@ object MusicPlayerEngine {
             originalList = originalList + track
             rebuildPlayingList(maintainPlayback = false)
             currentPlayingIndex = playingList.indexOfFirst { it.uriString == track.uriString }
+            Logger.debug("Трек добавлен в плейлист, новый размер=${playingList.size}", "Player")
         }
 
+        Logger.info("playTrack: '${track.title}' — ${track.artist} (index=$currentPlayingIndex, playlist=${playingList.size})", "Player")
         startPlayback(context, track)
     }
 
@@ -97,6 +102,7 @@ object MusicPlayerEngine {
         stopProgressTracker()
         initMediaSessionIfNeeded(context)
         val focusGranted = requestAudioFocus(context)
+        Logger.debug("startPlayback: '${track.title}', audioFocus=$focusGranted", "Player")
         try {
             mediaPlayer?.release()
             mediaPlayer = null
@@ -118,8 +124,13 @@ object MusicPlayerEngine {
             wasPlayingBeforeFocusLoss = !focusGranted
             _duration.value = player.duration.toLong()
             _currentPosition.value = 0L
+            Logger.info("Трек подготовлен: '${track.title}', duration=${player.duration} ms", "Player")
+            if (!focusGranted) {
+                Logger.warn("Аудиофокус не получен — воспроизведение отложено", "AudioFocus")
+            }
 
             player.setOnCompletionListener {
+                Logger.info("Трек завершён: '${track.title}'", "Player")
                 ListeningStatsManager.onTrackCompleted()
                 scope.launch {
                     delay(150)
@@ -128,6 +139,7 @@ object MusicPlayerEngine {
             }
 
             player.setOnErrorListener { _, what, extra ->
+                Logger.error("Ошибка MediaPlayer: what=$what extra=$extra", "Player")
                 _hasMediaError.value = "Ошибка проигрывателя: $what ($extra)"
                 _isPlaying.value = false
                 updateMediaSessionState(android.media.session.PlaybackState.STATE_ERROR)
@@ -138,7 +150,7 @@ object MusicPlayerEngine {
             updateMediaSessionMetadata(track)
             updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.error("Не удалось воспроизвести '${track.title}'", e, "Player")
             _hasMediaError.value = "Не удалось воспроизвести файл: ${e.localizedMessage}"
             _isPlaying.value = false
         }
@@ -155,6 +167,7 @@ object MusicPlayerEngine {
                 updateMediaSessionState(android.media.session.PlaybackState.STATE_PAUSED)
                 abandonAudioFocus()
                 wasPlayingBeforeFocusLoss = false
+                Logger.info("Пауза на позиции ${_currentPosition.value} ms", "Player")
             } else {
                 val focusGranted = requestAudioFocus(context)
                 if (focusGranted) {
@@ -164,16 +177,19 @@ object MusicPlayerEngine {
                         startPlaybackService(context)
                         startProgressTracker()
                         updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
+                        Logger.info("Возобновление воспроизведения", "Player")
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Logger.error("Не удалось возобновить воспроизведение", e, "Player")
                         _hasMediaError.value = "Не удалось возобновить воспроизведение"
                     }
                 } else {
                     wasPlayingBeforeFocusLoss = true
+                    Logger.warn("Возобновление отложено: нет аудиофокуса", "AudioFocus")
                 }
             }
         } else {
             // Nothing loaded, try playing first track
+            Logger.debug("togglePlayPause: плеер пуст, запускаю первый трек", "Player")
             if (playingList.isNotEmpty()) {
                 playTrack(context, playingList.first())
             }
@@ -191,6 +207,7 @@ object MusicPlayerEngine {
         
         val nextTrack = playingList.getOrNull(currentPlayingIndex)
         if (nextTrack != null) {
+            Logger.info("Следующий трек (index=$currentPlayingIndex): '${nextTrack.title}'", "Player")
             startPlayback(context, nextTrack)
         }
     }
@@ -206,6 +223,7 @@ object MusicPlayerEngine {
 
         val prevTrack = playingList.getOrNull(currentPlayingIndex)
         if (prevTrack != null) {
+            Logger.info("Предыдущий трек (index=$currentPlayingIndex): '${prevTrack.title}'", "Player")
             startPlayback(context, prevTrack)
         }
     }
@@ -216,13 +234,16 @@ object MusicPlayerEngine {
                 player.seekTo(positionMs.toInt())
                 _currentPosition.value = positionMs
                 updateMediaSessionState()
+                Logger.debug("Seek -> $positionMs ms", "Player")
             } catch (e: Exception) {
-                e.printStackTrace()
+                Logger.error("Ошибка seek на $positionMs ms", e, "Player")
             }
         }
     }
 
     private fun startProgressTracker() {
+        progressJob?.cancel()
+        Logger.debug("Трекер прогресса запущен", "Player")
         progressJob = scope.launch {
             while (true) {
                 mediaPlayer?.let { player ->
@@ -254,6 +275,7 @@ object MusicPlayerEngine {
         when (focusChange) {
             android.media.AudioManager.AUDIOFOCUS_GAIN -> {
                 hasAudioFocus = true
+                Logger.info("Аудиофокус получен (GAIN), возобновляем=${wasPlayingBeforeFocusLoss}", "AudioFocus")
                 if (wasPlayingBeforeFocusLoss) {
                     wasPlayingBeforeFocusLoss = false
                     mediaPlayer?.let { player ->
@@ -264,7 +286,7 @@ object MusicPlayerEngine {
                                 startProgressTracker()
                                 updateMediaSessionState(android.media.session.PlaybackState.STATE_PLAYING)
                             } catch (e: Exception) {
-                                e.printStackTrace()
+                                Logger.error("Не удалось возобновить воспроизведение при получении фокуса", e, "AudioFocus")
                             }
                         }
                     }
@@ -273,6 +295,7 @@ object MusicPlayerEngine {
             android.media.AudioManager.AUDIOFOCUS_LOSS -> {
                 hasAudioFocus = false
                 wasPlayingBeforeFocusLoss = false
+                Logger.info("Аудиофокус потерян (LOSS) — пауза", "AudioFocus")
                 mediaPlayer?.let { player ->
                     if (player.isPlaying) {
                         player.pause()
@@ -287,6 +310,7 @@ object MusicPlayerEngine {
             android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 hasAudioFocus = false
                 wasPlayingBeforeFocusLoss = _isPlaying.value
+                Logger.info("Аудиофокус временно потерян (type=$focusChange), играло=${wasPlayingBeforeFocusLoss}", "AudioFocus")
                 if (wasPlayingBeforeFocusLoss) {
                     mediaPlayer?.let { player ->
                         if (player.isPlaying) {
@@ -337,6 +361,7 @@ object MusicPlayerEngine {
         if (granted) {
             hasAudioFocus = true
         }
+        Logger.debug("requestAudioFocus -> $granted", "AudioFocus")
         return granted
     }
 
@@ -357,13 +382,14 @@ object MusicPlayerEngine {
         }
         ListeningStatsManager.init(context)
         if (mediaSession == null) {
+            Logger.debug("Инициализация MediaSession и регистрация приёмника наушников", "Player")
             mediaSession = android.media.session.MediaSession(context, "MusicPlayerEngine").apply {
                 setCallback(object : android.media.session.MediaSession.Callback() {
-                    override fun onPlay() { togglePlayPause(context) }
-                    override fun onPause() { togglePlayPause(context) }
-                    override fun onSkipToNext() { playNext(context) }
-                    override fun onSkipToPrevious() { playPrevious(context) }
-                    override fun onSeekTo(pos: Long) { seekTo(pos) }
+                    override fun onPlay() { Logger.debug("MediaSession onPlay", "Player"); togglePlayPause(context) }
+                    override fun onPause() { Logger.debug("MediaSession onPause", "Player"); togglePlayPause(context) }
+                    override fun onSkipToNext() { Logger.debug("MediaSession onSkipToNext", "Player"); playNext(context) }
+                    override fun onSkipToPrevious() { Logger.debug("MediaSession onSkipToPrevious", "Player"); playPrevious(context) }
+                    override fun onSeekTo(pos: Long) { Logger.debug("MediaSession onSeekTo($pos)", "Player"); seekTo(pos) }
                 })
                 isActive = true
             }
@@ -373,6 +399,7 @@ object MusicPlayerEngine {
                 val receiver = object : android.content.BroadcastReceiver() {
                     override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
                         if (intent.action == android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                            Logger.info("Наушники отключены — пауза", "Player")
                             if (_isPlaying.value) {
                                 togglePlayPause(context)
                             }
@@ -426,7 +453,9 @@ object MusicPlayerEngine {
         noisyAudioReceiver?.let {
             try {
                 appContext?.unregisterReceiver(it)
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) {
+                Logger.warn("Не удалось снять регистрацию приёмника наушников: ${e.message}", "Player")
+            }
             noisyAudioReceiver = null
         }
         
@@ -436,6 +465,7 @@ object MusicPlayerEngine {
         mediaPlayer = null
         _isPlaying.value = false
         _currentTrack.value = null
+        Logger.info("Плеер освобождён", "Player")
     }
 
     private fun startPlaybackService(context: Context) {
@@ -447,7 +477,7 @@ object MusicPlayerEngine {
                 context.startService(serviceIntent)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.warn("Не удалось запустить PlaybackService: ${e.message}", "Service")
         }
     }
 }

@@ -7,9 +7,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -46,6 +48,8 @@ fun LogsSubmenuScreen(
 ) {
     var selectedCategory by remember { mutableStateOf(LogCategory.APP) }
     var searchQuery by remember { mutableStateOf("") }
+    var levelFilter by remember { mutableStateOf<LogLevel?>(null) }
+    var verboseLogging by remember { mutableStateOf(Logger.isDebugEnabled()) }
     
     val appLogs by Logger.appLogs.collectAsStateWithLifecycle()
     val apiLogs by Logger.apiLogs.collectAsStateWithLifecycle()
@@ -53,8 +57,11 @@ fun LogsSubmenuScreen(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    val currentLogList = remember(selectedCategory, appLogs, apiLogs, searchQuery) {
-        val baseList = if (selectedCategory == LogCategory.APP) appLogs else apiLogs
+    val currentLogList = remember(selectedCategory, appLogs, apiLogs, searchQuery, levelFilter) {
+        var baseList = if (selectedCategory == LogCategory.APP) appLogs else apiLogs
+        if (levelFilter != null) {
+            baseList = baseList.filter { it.level == levelFilter }
+        }
         if (searchQuery.isBlank()) {
             baseList
         } else {
@@ -231,6 +238,36 @@ fun LogsSubmenuScreen(
             }
         }
 
+        // LEVEL FILTER + VERBOSE TOGGLE
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LogLevelFilterChip(label = "ALL", selected = levelFilter == null) { levelFilter = null }
+            LogLevel.values().forEach { level ->
+                LogLevelFilterChip(label = level.name, selected = levelFilter == level) {
+                    levelFilter = if (levelFilter == level) null else level
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            LogLevelFilterChip(
+                label = if (verboseLogging) "VERBOSE ON" else "VERBOSE OFF",
+                selected = verboseLogging
+            ) {
+                verboseLogging = !verboseLogging
+                Logger.setMinLevel(if (verboseLogging) LogLevel.DEBUG else LogLevel.INFO)
+                Toast.makeText(
+                    context,
+                    if (verboseLogging) "Verbose logging ON" else "Verbose logging OFF",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
         // SEARCH BAR
         OutlinedTextField(
             value = searchQuery,
@@ -382,4 +419,23 @@ private fun LogEntryItem(
             lineHeight = 15.sp
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LogLevelFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = Color(0xFF118270),
+            selectedLabelColor = Color.White,
+            labelColor = Color.Gray
+        )
+    )
 }

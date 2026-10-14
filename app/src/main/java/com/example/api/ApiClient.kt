@@ -6,6 +6,8 @@ import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import com.example.ui.LogLevel
+import com.example.ui.Logger
 import java.util.concurrent.TimeUnit
  
 object ApiClient {
@@ -22,14 +24,21 @@ object ApiClient {
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .header("Connection", "close")
                 .build()
-            
-            com.example.ui.Logger.log("HTTP Req: ${request.method} ${request.url}")
+
+            val start = Logger.now()
+            Logger.logApi("→ ${request.method} ${request.url}", LogLevel.DEBUG, "HTTP")
             try {
                 val response = chain.proceed(request)
-                com.example.ui.Logger.log("HTTP Res: ${response.code} ${response.message}")
+                val ms = Logger.now() - start
+                val level = if (response.isSuccessful) LogLevel.INFO else LogLevel.WARN
+                Logger.logApi("← ${response.code} ${response.message} (${ms} ms)", level, "HTTP")
                 response
             } catch (e: Exception) {
-                com.example.ui.Logger.log("HTTP Error: ${e.javaClass.simpleName} - ${e.message}")
+                Logger.logApi(
+                    "✕ ${request.method} ${request.url}: ${e.javaClass.simpleName} - ${e.message}",
+                    LogLevel.ERROR,
+                    "HTTP"
+                )
                 throw e
             }
         }

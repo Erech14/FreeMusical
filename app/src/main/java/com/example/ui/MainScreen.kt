@@ -110,6 +110,10 @@ fun MainScreen(
         debouncedSearchQuery = searchQuery
     }
     var isPlayerDetailedOpened by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedTab) { Logger.debug("Открыта вкладка #$selectedTab", tag = "UI") }
+    LaunchedEffect(isPlayerDetailedOpened) {
+        Logger.debug("Полноэкранный плеер: ${if (isPlayerDetailedOpened) "открыт" else "закрыт"}", tag = "UI")
+    }
     var showPlaylistNameDialog by remember { mutableStateOf(false) }
     var pendingPlaylistUri by remember { mutableStateOf<Uri?>(null) }
     var newPlaylistName by remember { mutableStateOf("") }
@@ -126,7 +130,9 @@ fun MainScreen(
             val takeFlags: Int = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             try {
                 context.contentResolver.takePersistableUriPermission(uri, takeFlags)
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) {
+                Logger.warn("Не удалось получить доступ к папке плейлиста: ${e.message}", tag = "Playlist")
+            }
             
             pendingPlaylistUri = uri
             showPlaylistNameDialog = true
@@ -137,7 +143,10 @@ fun MainScreen(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri != null) {
+            Logger.info("Пользователь выбрал папку: $uri", tag = "UI")
             viewModel.selectFolder(uri)
+        } else {
+            Logger.warn("Выбор папки отменён", tag = "UI")
         }
     }
     // Storage permission launcher depending on SDK
@@ -151,12 +160,17 @@ fun MainScreen(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val isGranted = permissions.entries.all { it.value }
+        Logger.info(
+            "Результат запроса разрешений: granted=$isGranted " +
+                "(${permissions.entries.joinToString { "${it.key.substringAfterLast('.')}=${it.value}" }})",
+            tag = "UI"
+        )
         viewModel.setPermissionGranted(isGranted)
         if (isGranted && selectedFolderUri == null) {
             try {
                 folderPickerLauncher.launch(null)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Logger.error("Не удалось открыть выбор папки", e, "UI")
             }
         }
     }
@@ -181,7 +195,7 @@ fun MainScreen(
                     }
                     context.startActivity(intent)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Logger.warn("Не удалось запросить отключение оптимизации батареи: ${e.message}", tag = "UI")
                 }
             }
         }
@@ -804,7 +818,7 @@ fun MainScreen(
                                                             android.widget.Toast.makeText(settingsContext, Strings.get("export_stats_empty", language), android.widget.Toast.LENGTH_SHORT).show()
                                                         }
                                                     } catch (e: Exception) {
-                                                        e.printStackTrace()
+                                                        Logger.error("Ошибка экспорта статистики", e, "Stats")
                                                         android.widget.Toast.makeText(settingsContext, "Error", android.widget.Toast.LENGTH_SHORT).show()
                                                     }
                                                 }

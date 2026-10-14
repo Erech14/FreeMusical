@@ -2,6 +2,7 @@ package com.example.player
 
 import android.content.Context
 import com.example.data.Track
+import com.example.ui.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,6 +30,7 @@ object ListeningStatsManager {
     fun init(context: Context) {
         if (appContext != null) return
         appContext = context.applicationContext
+        Logger.debug("Менеджер статистики инициализирован", tag = "Stats")
         
         // Determine the next ID based on the existing file
         scope.launch {
@@ -41,7 +43,7 @@ object ListeningStatsManager {
                         currentRecordId = lastObj.optInt("id", 0) + 1
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Logger.warn("Не удалось прочитать файл статистики: ${e.message}", tag = "Stats")
                 }
             }
         }
@@ -54,12 +56,14 @@ object ListeningStatsManager {
                 maxPositionReached = currentDuration // Force 100%
                 history[lastIdx] = TrackStat(currentTrackTitle, 100, "прослушан полностью")
                 saveToJson()
+                Logger.info("Статистика: трек прослушан полностью — '$currentTrackTitle'", tag = "Stats")
             }
         }
     }
 
     fun onTrackChanged(track: Track?) {
         scope.launch {
+            Logger.debug("Статистика: смена трека -> '${track?.title ?: "нет"}'", tag = "Stats")
             if (currentTrackTitle.isNotEmpty()) {
                 // Finalize previous track in history
                 val lastStatus = if (history.isNotEmpty()) history.last().status else ""
@@ -106,6 +110,7 @@ object ListeningStatsManager {
         // Save current progress when paused
         scope.launch {
             if (currentTrackTitle.isNotEmpty()) {
+                Logger.debug("Статистика: сохранение прогресса '$currentTrackTitle' на паузе", tag = "Stats")
                 updateCurrentHistoryAndSave()
             }
         }
@@ -136,8 +141,9 @@ object ListeningStatsManager {
                         file.writeText("[]")
                     }
                 }
+                Logger.info("Статистика прослушивания очищена", tag = "Stats")
             } catch (e: Exception) {
-                e.printStackTrace()
+                Logger.warn("Не удалось очистить статистику: ${e.message}", tag = "Stats")
             }
         }
     }
@@ -206,7 +212,7 @@ object ListeningStatsManager {
             
             file.writeText(jsonArray.toString(4))
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.warn("Не удалось сохранить статистику: ${e.message}", tag = "Stats")
         }
     }
 }

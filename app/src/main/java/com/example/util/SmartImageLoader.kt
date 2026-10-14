@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.example.R
 import com.example.data.Track
+import com.example.ui.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -131,7 +132,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                     // RGB_565 + downsampling: меньше памяти и быстрее декодирование.
                     decodeSampledBitmapFromFile(file.absolutePath, THUMBNAIL_SIZE, THUMBNAIL_SIZE)?.let { return it }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Logger.warn("Не удалось прочитать кэш обложки ${file.name}: ${e.message}", tag = "Covers")
                 }
             }
         }
@@ -146,7 +147,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                 out.flush()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.warn("Не удалось записать кэш обложки: ${e.message}", tag = "Covers")
         }
     }
 
@@ -236,6 +237,8 @@ class SmartImageLoader private constructor(private val context: Context) {
         // Only one preload pass at a time: repeated list emissions would otherwise
         // pile up concurrent decoding tasks and compete with the UI for CPU.
         if (!isPreloading.compareAndSet(false, true)) return
+        val start = Logger.now()
+        Logger.debug("Предзагрузка обложек: ${tracks.size} треков", tag = "Covers")
         executorService.submit {
             try {
                 for (track in tracks) {
@@ -270,6 +273,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                 }
             } finally {
                 isPreloading.set(false)
+                Logger.debug("Предзагрузка обложек завершена: ${Logger.now() - start} ms", tag = "Covers")
             }
         }
     }
@@ -301,6 +305,7 @@ class SmartImageLoader private constructor(private val context: Context) {
                 } else null
             }
         } catch (e: Exception) {
+            Logger.warn("Не удалось извлечь обложку из $uriString: ${e.message}", tag = "Covers")
             null
         } finally {
             try {
@@ -423,10 +428,11 @@ class SmartImageLoader private constructor(private val context: Context) {
     fun clearCache() {
         ramCache.evictAll()
         composeImageCache.clear()
+        Logger.info("Кэш обложек очищен (RAM + диск)", tag = "Covers")
         try {
             cacheDir.listFiles()?.forEach { it.delete() }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.warn("Не удалось удалить файлы кэша обложек: ${e.message}", tag = "Covers")
         }
     }
 }
