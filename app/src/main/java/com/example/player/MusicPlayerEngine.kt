@@ -387,7 +387,8 @@ object MusicPlayerEngine {
             appContext = context.applicationContext
         }
         ListeningStatsManager.init(context)
-        TrackBroadcaster.init(context)
+        // Применяем сохранённые настройки интеграций (broadcast + HTTP-сервер).
+        TrackApiConfig.apply(context)
         if (mediaSession == null) {
             Logger.debug("Инициализация MediaSession и регистрация приёмника наушников", "Player")
             mediaSession = android.media.session.MediaSession(context, "MusicPlayerEngine").apply {

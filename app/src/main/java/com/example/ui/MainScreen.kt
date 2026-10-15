@@ -802,11 +802,17 @@ fun MainScreen(
                                 2 -> {
                                     // ТАБ 2: НАСТРОЙКИ (Settings screen)
                                     var showLogsSubmenu by remember { mutableStateOf(false) }
+                                    var showIntegrationSubmenu by remember { mutableStateOf(false) }
 
                                     if (showLogsSubmenu) {
                                         LogsSubmenuScreen(
                                             language = language,
                                             onBack = { showLogsSubmenu = false }
+                                        )
+                                    } else if (showIntegrationSubmenu) {
+                                        IntegrationSubmenuScreen(
+                                            language = language,
+                                            onBack = { showIntegrationSubmenu = false }
                                         )
                                     } else {
                                         val currentThemeVal by viewModel.appTheme.collectAsStateWithLifecycle()
@@ -1282,6 +1288,61 @@ fun MainScreen(
                                                             Spacer(modifier = Modifier.height(2.dp))
                                                             Text(
                                                                 text = Strings.get("logs_subtitle", language),
+                                                                fontSize = 11.sp,
+                                                                color = Color.Gray
+                                                            )
+                                                        }
+                                                        Icon(
+                                                            imageVector = Icons.Default.KeyboardArrowRight,
+                                                            contentDescription = null,
+                                                            tint = Color.Gray,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
+
+                                                // INTEGRATION (broadcast + HTTP server) LINK CARD
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(top = 12.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .border(1.dp, Color(0xFF00F5D4).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                                        .clickable { showIntegrationSubmenu = true },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(14.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(40.dp)
+                                                                .clip(CircleShape)
+                                                                .background(Color(0xFF00F5D4).copy(alpha = 0.15f)),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Cast,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF00F5D4),
+                                                                modifier = Modifier.size(22.dp)
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.width(14.dp))
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = Strings.get("connection_menu_item", language),
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 15.sp,
+                                                                color = Color.White
+                                                            )
+                                                            Spacer(modifier = Modifier.height(2.dp))
+                                                            Text(
+                                                                text = Strings.get("connection_subtitle", language),
                                                                 fontSize = 11.sp,
                                                                 color = Color.Gray
                                                             )
